@@ -16,19 +16,19 @@ When a subscribed event occurs, Proof queues a delivery for each enabled endpoin
 
 <Steps>
   <Step title="Open the Webhooks panel">
-    Navigate to **Settings / Webhooks** in the Proof admin UI.
+    Go to **Settings**, then **Webhooks**. The panel is titled **Outbound webhooks**.
   </Step>
   <Step title="Add an endpoint">
-    Enter your HTTPS URL and select the event types you want to receive. You can subscribe to specific events or choose the wildcard (`*`) to receive every event type.
+    Enter your **Endpoint URL** and select the event types you want to receive. If you select none, the endpoint receives every event type (`*`). Click **Add endpoint**.
   </Step>
   <Step title="Copy the signing secret">
     After creation, the UI displays the signing secret once. Copy it immediately and store it securely. Proof never shows the secret again.
   </Step>
   <Step title="Send a test delivery">
-    Click **Send test** on the endpoint row. Proof queues a `ping` event so you can verify connectivity and signature verification before going live.
+    Click the send (paper plane) button on the endpoint row. Proof shows **Test delivery queued** and queues a `ping` event, delivered within a minute, so you can verify connectivity and signature verification before going live.
   </Step>
-  <Step title="Enable or edit the endpoint">
-    Use the toggle to enable or disable the endpoint. You can also update the event types or description at any time. Re-enabling an endpoint resets its failure streak.
+  <Step title="Enable or disable the endpoint">
+    Use the toggle to enable or disable the endpoint. Re-enabling an endpoint resets its failure streak. The UI does not edit an endpoint's event types after creation; to change them, delete the endpoint (trash button) and add it again.
   </Step>
 </Steps>
 

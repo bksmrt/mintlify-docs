@@ -131,11 +131,28 @@
               "user-guide/curriculum/courses",
               "user-guide/curriculum/course-details",
               "user-guide/curriculum/programs",
+              "user-guide/curriculum/sections",
               {
                 "group": "How to",
                 "pages": [
                   "user-guide/curriculum/how-to/propose-a-new-course",
-                  "user-guide/curriculum/how-to/change-or-deactivate-a-course"
+                  "user-guide/curriculum/how-to/change-or-deactivate-a-course",
+                  "user-guide/curriculum/how-to/schedule-a-section",
+                  "user-guide/curriculum/how-to/roll-forward-a-schedule"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Reports and audit",
+            "pages": [
+              "user-guide/reports/report-studio",
+              "user-guide/reports/audit-trail",
+              {
+                "group": "How to",
+                "pages": [
+                  "user-guide/reports/how-to/share-and-schedule-a-report",
+                  "user-guide/reports/how-to/check-who-changed-a-record"
                 ]
               }
             ]

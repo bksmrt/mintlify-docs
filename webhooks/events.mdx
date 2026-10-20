@@ -28,7 +28,7 @@ Every POST body follows this shape:
 | `project.status.changed` | A project status changes (defined in the event registry) |
 | `billing.checkout_completed` | A Stripe checkout session completes for the institution |
 | `billing.read_only_entered` | The institution enters a billing read-only state |
-| `ping` | Manually queued via the **Send test** button |
+| `ping` | Manually queued with the send (test) button on an endpoint row |
 | `*` | Wildcard: subscribe to every event type listed above |
 
 <Note>
@@ -151,7 +151,7 @@ Fired when an institution's subscription enters a read-only state due to past-du
 
 ### `ping`
 
-Queued manually through the **Send test** button in the webhooks UI.
+Queued manually with the send (test) button on an endpoint row in the webhooks UI.
 
 ```json
 {

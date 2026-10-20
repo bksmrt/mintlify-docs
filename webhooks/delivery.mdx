@@ -20,13 +20,13 @@ Proof retries failed deliveries with exponential backoff. The delay between atte
 
 | Attempt | Delay after previous failure |
 | --- | --- |
-| 1st retry | 1 minute |
-| 2nd retry | 5 minutes |
-| 3rd retry | 30 minutes |
-| 4th retry | 2 hours |
-| 5th retry | 12 hours |
+| 1st attempt | Sent when the event occurs |
+| 2nd attempt | 5 minutes |
+| 3rd attempt | 30 minutes |
+| 4th attempt | 2 hours |
+| 5th attempt | 12 hours |
 
-After the final retry (5 attempts total), the delivery is marked as failed and no further attempts are made.
+If the 5th attempt fails, the delivery is marked as failed and no further attempts are made.
 
 <Note>
   The retry schedule is the same shape used by the email retry queue. Delays are applied from the moment the previous attempt fails, not from the original event time.
@@ -34,7 +34,7 @@ After the final retry (5 attempts total), the delivery is marked as failed and n
 
 ## Auto-disable
 
-If an endpoint accumulates **20 consecutive failed batches**, Proof automatically disables it. The UI shows the disabled reason: "Auto-disabled after 20 consecutive delivery failures."
+If an endpoint accumulates **20 consecutive failed delivery attempts**, Proof automatically disables it. The UI shows the disabled reason: "Auto-disabled after 20 consecutive delivery failures". Any successful delivery resets the count to zero.
 
 When you re-enable an endpoint from the webhooks UI, the failure streak resets to zero and deliveries resume normally.
 
@@ -62,7 +62,7 @@ Supported protocols are `http:` and `https:`. Redirects are limited to 5 hops.
 
 ## Delivery log in the UI
 
-The webhooks panel shows the last **50 deliveries** per endpoint, including:
+On an endpoint row, click **Show recent deliveries** to see its last **50 deliveries**, including:
 
 - Event type and timestamp
 - Delivery status (`pending`, `succeeded`, or `failed`)
@@ -74,7 +74,7 @@ Use this log to diagnose why an endpoint is failing before it hits the auto-disa
 
 ## Test deliveries
 
-Click **Send test** on any endpoint row to queue a `ping` event. Test deliveries are processed through the same pipeline as real events, so they exercise your signature verification, timeout handling, and network path.
+Click the send (paper plane) button on any endpoint row to queue a `ping` event. Test deliveries are processed through the same pipeline as real events, so they exercise your signature verification, timeout handling, and network path.
 
 ## Retention
 
