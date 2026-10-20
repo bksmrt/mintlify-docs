@@ -109,6 +109,36 @@
                 ]
               }
             ]
+          },
+          {
+            "group": "Approvals and inbox",
+            "pages": [
+              "user-guide/approvals/inbox",
+              "user-guide/approvals/approvals",
+              {
+                "group": "How to",
+                "pages": [
+                  "user-guide/approvals/how-to/decide-an-approval",
+                  "user-guide/approvals/how-to/resubmit-after-changes",
+                  "user-guide/approvals/how-to/triage-your-inbox"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Curriculum",
+            "pages": [
+              "user-guide/curriculum/courses",
+              "user-guide/curriculum/course-details",
+              "user-guide/curriculum/programs",
+              {
+                "group": "How to",
+                "pages": [
+                  "user-guide/curriculum/how-to/propose-a-new-course",
+                  "user-guide/curriculum/how-to/change-or-deactivate-a-course"
+                ]
+              }
+            ]
           }
         ]
       },
