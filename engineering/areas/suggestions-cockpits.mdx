@@ -1,0 +1,116 @@
+---
+title: "Suggestions cockpits"
+description: "The four cockpit mirrors, shared chrome, rankers, and the meeting-pattern advisor chat that help schedulers and students make decisions."
+sidebarTitle: "Suggestions cockpits"
+---
+
+The suggestions cockpits are four mirrored surfaces: Student Suggestions, Section Rooms, Section Meeting Patterns, and the Workload Studio Advisor. They share a single chrome library and mostly the same focus-card surface contract. Each cockpit consumes ranked candidates from its own scoring module and presents them through a consistent navigation shell.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Shared cockpit chrome | `client/src/components/student-suggestions/chrome.tsx` |
+| Room Suggestions types | `shared/room-suggestions-types.ts` |
+| Room ranker | `server/modules/room-match/rank-rooms.ts` |
+| Room candidates route | `server/roomSuggestionsRoutes.ts` |
+| Room hook | `client/src/hooks/use-room-candidates.ts` |
+| Room surfaces | `client/src/pages/section-rooms/{index,conversation,ledger,compare}.tsx` |
+| Meeting Pattern types | `shared/meeting-pattern-suggestions-types.ts` |
+| Meeting Pattern ranker | `server/modules/meeting-pattern-match/rank-meeting-patterns.ts` |
+| Meeting Pattern candidates route | `server/meetingPatternSuggestionsRoutes.ts` |
+| Meeting Pattern hook | `client/src/hooks/use-meeting-pattern-candidates.ts` |
+| Meeting Pattern surfaces | `client/src/pages/section-meeting-patterns/{index,conversation,ledger,compare}.tsx` |
+| Meeting Pattern advisor chat | `server/meetingPatternAdvisorRoutes.ts` |
+| Meeting Pattern chat turn schema | `shared/schema.ts::meetingPatternAdvisorChatTurns` |
+| Student Suggestions surfaces | `client/src/pages/student-suggestions/{index,conversation,ledger,dossier,assistant}.tsx` |
+| Workload Studio advisor | `client/src/components/workload-studio/advisor.tsx` |
+| AI routing | `server/modules/ai-routing/router.ts` |
+| Grounded chat prompt | `server/modules/ai-routing/grounded-chat-prompt.ts` |
+
+## Shared chrome library
+
+`client/src/components/student-suggestions/chrome.tsx` is the single source of truth for cockpit visual language. It exports `PanelShell`, `PanelTabStrip`, `PanelTabBody`, and a set of graduated primitives from the smart-suggestions redesign: `Paragraph`, `EnvelopeChip`, `EthosPip`, `ScoreBreakdown`, `SingleUseCTA`, `Disclosure`, `Highlight`, `RankBadge`, `Monogram`, `CourseBadge`, and `NextButton`. Surfaces never re-implement these.
+
+## The four cockpit mirrors
+
+### Student Suggestions
+
+The Student Suggestions surface lives at `/student/suggestions/{conversation,ledger,dossier,assistant}`. The `index.tsx` entry point is a single three-step sequential-reveal surface: Best Match, Best Available, then Advisor. Sub-route files are deep-link shims that re-render the shell with an `initialSurface` mapping to `{step, openDisclosure}`. Live data flows through `useStudentSuggestions`. The student-side advisor chat backend is a follow-up item.
+
+### Section Rooms
+
+Section Rooms lives at `/sections/:id/rooms/{conversation,assistant,ledger,compare}`. The `index.tsx` surface graduated from `ConversationRoom.tsx` into a single focus-card layout: best room, runner-up callout, ranked-list disclosure, and a blocked-note rail. Sub-route files are deep-link shims. Live data comes from `useRoomCandidates`.
+
+The room ranker in `server/modules/room-match/rank-rooms.ts` is a pure five-signal weighted scorer:
+
+| Signal | Weight |
+| --- | --- |
+| capacityFit | 0.30 |
+| buildingProximity | 0.20 |
+| avCoverage | 0.20 |
+| accessibility | 0.15 |
+| bookingFree | 0.15 |
+
+### Section Meeting Patterns
+
+Meeting Patterns lives at `/sections/:id/meeting-patterns/{conversation,assistant,ledger,compare}`. The entry point is still the four-tab `PanelTabStrip` shell, unchanged in the cockpit redesign that collapsed the other three mirrors. The Meeting Pattern Assistant is the live grounded-chat surface. Graduation to the single-focus-card idiom is pending the `ConversationMeetingPattern` mockup sketch.
+
+The meeting-pattern ranker in `server/modules/meeting-pattern-match/rank-meeting-patterns.ts` is another pure five-signal weighted scorer:
+
+| Signal | Weight |
+| --- | --- |
+| slotTemplate | 0.30 |
+| instructorFree | 0.25 |
+| roomFree | 0.15 |
+| studentDemand | 0.15 |
+| contactMinutesFit | 0.15 |
+
+It also exposes `buildStandardSlotGrid()`, which produces the MWF-50 hourly grid (8a to 3p), TR-75 and MW-75 six-block grids, and a single ASYNC row that always ranks below in-person standards. `RankOptions.zeroSlotTemplateWeight` powers the Compare surface's "Standard-slot bonus" toggle.
+
+### Workload Studio Advisor
+
+The Workload Studio per-section Advisor lives at `/workload-studio/advisor?sectionId=...`. It graduated from `ConversationFaculty.tsx` into a single faculty-focus card with the live LLM-backed transcript. The transcript sits in an inline `<Disclosure>`. Section-picker, candidates query, and chat transcript or turn plumbing are preserved verbatim.
+
+## Advisor chat architecture
+
+All three advisor chats (Rooms, Meeting Patterns, and Workload Studio) share the same grounded-chat prompt contract from `server/modules/ai-routing/grounded-chat-prompt.ts`. The contract has four locked blocks (A, B, D) plus a register-specific vocabulary in Block C. Each advisor register adds its own `scheduler_*` vocabulary and handoff key.
+
+For Meeting Patterns, the register is `scheduler_meeting_pattern`. Its Block B vocabulary covers slot template, instructor-free, room-free, student demand, contact-minutes fit, standard vs off-grid, and async. The handoff key is `slotId`, mirrored on `agent_handoff` bubbles and in `extractHandoffKey` / `validateAdvisorBubbleShape`. The prompt-version hash is SHA-256 and preserved verbatim across register extensions.
+
+Turns run through `routeAIRequest({taskType:"meeting_pattern_advisor_assistant"})` with a triple-provider fallback chain. The system enforces a recommendation contract with one retry plus a tradeoffs-only degrade. Both user and assistant turns persist to `meeting_pattern_advisor_chat_turns`, and a `meeting_pattern_advisor_turn` audit row records `promptVersion`, `model`, `usedPath`, `latencyMs`, `bubbleKindCounts`, `downgraded`, `retryAttempted`, and `degraded`.
+
+Retention is 180 days with a hard cap of 200 turns per `(institutionId, userId, sectionId)`.
+
+## Re-ranking and constraints
+
+The advisor does not re-rank inside the LLM. Instead, the server derives constraints from the user's plain-language input through deterministic pattern matching (`server/modules/advisor-constraints/derive.ts`), then re-ranks the candidate pool before grounding the model. This keeps the LLM contract honest: the model narrates what the ranker actually did.
+
+Three re-rank entry points exist, one per candidate type:
+
+- `rerankMeetingPatternCandidates` (extended from the Compare toggle)
+- `rerankRoomCandidates` + `roomConstraintFit`
+- `rerankStudentCandidates` + `studentConstraintFit`
+
+All three preserve blocked-last ordering, sort by fit then score, and never change the underlying scores.
+
+## Soft-skip rule
+
+A skip is a soft deprioritization, not a filter. The advisor grounds on the whole field and uses the skip set as a tiebreaker. If a new constraint makes a skipped candidate the best answer, the advisor resurfaces it with a flag that notes the prior skip.
+
+The skip set is tracked through `useSkippedSet` in cockpit-chrome and marked only on the "Not this one" click. It is never marked on display.
+
+## Rules and gotchas
+
+- **The chrome library in `student-suggestions/chrome.tsx` is canonical.** Do not rename the import paths even when consuming it from Room Suggestions or Meeting Pattern Suggestions.
+- **The meeting-pattern mirror is the one cockpit still on the four-tab shell.** Plan surface changes accordingly.
+- **Every advisor turn re-fetches grounding server-side** from the same ranker the candidate route uses. Do not cache candidate lists across turns.
+- **The soft-skip set is ranking context, not a hard exclude.** The prompt must receive it so the model can narrate the rule correctly.
+- **Advisor transcripts are per `(institutionId, userId, sectionId)`** and capped at 200 turns. Design long-running advisory sessions with this limit in mind.
+
+## Related pages
+
+- [Sections](/engineering/areas/sections)
+- [Teaching and faculty](/engineering/areas/teaching-and-faculty)
+- [Instructional standards](/engineering/areas/instructional-standards)
+- [AI services](/engineering/foundations/ai-services)

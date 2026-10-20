@@ -1,0 +1,160 @@
+---
+title: "Approvals framework"
+description: "The Dynamic Approval Framework: policies, the resolver engine, the kind registry, and how every decision in Proof converges on one card and one feed."
+sidebarTitle: "Approvals framework"
+---
+
+Proof routes every decision that one person makes on another's submission through a single framework. Whether the subject is a curriculum proposal, a faculty appointment, a narrative section review, or a compliance exception, the same policy template, resolver engine, and triage feed apply. This page explains the schema, the resolver, the kind registry, and the runtime conventions that keep approvals consistent.
+
+## Where things live
+
+| File | Purpose |
+| --- | --- |
+| `shared/schema.ts` | `approval_policies`, `approval_policy_steps`, `approval_step_eligibility_rules`, `approval_requests`, `approval_request_steps`, `approval_request_decisions`, and related enums |
+| `server/approvalResolver.ts` | Pure resolver engine: eligibility expansion, routing modes, override merge, and snapshot flattening |
+| `server/approvalRequests.ts` | Engine runtime: submit, decide, delegate, suspend, recall, and audit-safe transitions |
+| `server/approvals/kinds.ts` | The approval kind registry: every subject kind registers a triage provider |
+| `server/courseApprovalFinalize.ts` | Terminal effects for course-subject requests |
+| `server/programApprovalFinalize.ts` | Terminal effects for program-subject requests |
+| `server/modules/approval-policy/generator.service.ts` | No-code approval policy generation service |
+| `docs/design/approvals-one.md` | The contract: one decision card, one reason rule, one feed |
+| `.agents/memory/approval-request-changes-loop.md` | Resubmit-as-new-cycle design for returned proposals |
+| `.agents/memory/daf-branch-traversal.md` | Conditional branch traversal in the resolver |
+
+## Policy schema and snapshots
+
+A policy is a template made of three tables:
+
+1. `approval_policies` : the policy header, its scope, and inheritance rules
+2. `approval_policy_steps` : the ordered steps of the policy
+3. `approval_step_eligibility_rules` : who may decide at each step
+
+Policies are scoped by inheritance order: `project_specific` > `engagement` > `project_type` > `institution` > `bksmrt_default`. Firm-scoped policies (`scope = "firm"`) apply across all of that firm's active engagements.
+
+At request creation, the resolver flattens the resolved template and any `approval_policy_overrides` into fully snapshotted `approval_request_steps` rows. In-flight policy edits never leak into a running request.
+
+### Step kinds
+
+The `approval_policy_steps` table uses a `stepKind` discriminator. `approver_step` is the primary kind: it requires eligibility rules and produces decisions. Other kinds encode control flow such as `wait_delay`, `join`, and `conditional_gate`. The executor activates steps by sequence only.
+
+### Override rules
+
+Per-project customization writes overrides with `source='project_customize'` before the request runs. The merge order is deterministic: replace, delete, add, reorder. Step-level edits are blocked when `is_locked = true`, and new steps are blocked unless the parent policy has `allow_additional_steps = true`.
+
+## The resolver engine
+
+`server/approvalResolver.ts` is a pure function: given the same `ResolverContext`, it always returns the same `ResolvedApprovalPlan`. It performs no database I/O. The caller is responsible for loading the policy, eligibility rules, overrides, committees, and user directory snapshot before invoking it.
+
+### What the resolver does
+
+- Eligibility expansion for all approver kinds (role, department, committee, named user, manager chain, cross-tenant)
+- Hard submitter-block and collaborator-exclusion (the submitter may not decide their own request, except at a `submitter_ack` step)
+- Whitelist predicate DSL for eligibility rules: no `eval`, no arbitrary function access
+- Routing modes: `sequential`, `parallel_all`, `parallel_any`, with vote weighting and SLA timers
+- Delegation override and blind-review annotations on output
+- Override merge with tampering detection for locked steps
+- Soft-deleted committee member filtering
+
+### Phase 5: firm consultant snapshot
+
+The resolver accepts a `ResolverFirmConsultant` snapshot for `firm_user` and `firm_role` eligibility kinds. The caller filters `engagedInstitutionIds` to active engagements before passing it in.
+
+## Runtime engine
+
+`server/approvalRequests.ts` turns a resolved plan into a live request. It handles:
+
+- `submitApprovalRequest`: creates the request, flattens steps, and notifies deciders
+- `decideApprovalStep`: records a decision, advances the step, and triggers terminal effects
+- `withdrawForResubmit`: closes the current cycle as withdrawn and starts a new one
+- `delegateApprovalStep`: reassigns a step to another eligible user
+- `suspendApprovalRequest`: pauses a request
+- `recallApprovalRequest`: allows the submitter to pull the request back
+
+Every engine transition writes an audit row. The `auditSafe` helper is crash-isolated: a failed audit write does not roll back the transition.
+
+### Audit rows per transition
+
+| Action | Audit event |
+| --- | --- |
+| Decide (approve / reject / send back / suspend / force approve) | `approval_decision` |
+| Request changes | `approval_changes_requested` |
+| Resubmit as new cycle | `approval_resubmit` |
+| Recall | `approval_recall` |
+| Resume | `approval_resume` |
+| Delegate | `approval_delegate` |
+
+## Subject kinds and the kind registry
+
+`APPROVAL_SUBJECT_KINDS` in `shared/schema.ts` defines the four engine-native subjects:
+
+- `project`
+- `faculty_invitation`
+- `course`
+- `program`
+
+A course or program subject request has `subject_course_id` or `subject_program_id` set, a null `projectId`, and its terminal effects live in `server/courseApprovalFinalize.ts` and `server/programApprovalFinalize.ts`.
+
+The kind registry in `server/approvals/kinds.ts` extends this to every decision surface in the product. Each kind registers a `triageRows` provider that feeds the unified Approvals page and Inbox. A kind outside the registry is a defect, not a choice.
+
+### Registered kinds
+
+| Kind | Source module | Decision surface |
+| --- | --- | --- |
+| `project` | `curriculum-proposals/triage` | Curriculum proposals |
+| `faculty_invitation` | `curriculum-proposals/triage` | Faculty appointments |
+| `course` | `curriculum-proposals/triage` | Course approvals |
+| `program` | `curriculum-proposals/triage` | Program approvals |
+| `narrative_section` | `narrative-readings/triage` | Narrative section reviews |
+| `curriculum_exception` | `curriculum-exceptions/triage` | Substitutions, waivers, exceptions |
+| `validation_exemption` | `validation-exemptions/triage` | Exemption requests |
+| `recall` | `recall/triage` | Committee recall |
+| `narrative_reconciliation` | `narrative-reconciliation/triage` | Firm reconciliation proposals |
+| `project_attach` | `project-attach/triage` | Attach requests |
+| `compliance_exception` | `compliance-exceptions/triage` | Compliance rule exceptions |
+| `narrative_suggestion` | `narrative-suggestions/triage` | Narrative suggestions |
+
+The `approvalTriageRows` function collects every kind's rows, merges historical participant lists via `withAsked`, and returns a single sorted feed.
+
+## The one decision card
+
+`docs/design/approvals-one.md` governs the contract for every decision surface:
+
+- **The words**: `Approve`, `Request changes`, `Decline` (and the committee's ballot words where the committee signs)
+- **The reason rule**: ten characters or more are required to request changes or decline, and to approve anything that carries items not in line
+- **The decision card**: one shared component that shows the record's name, what it carries, whose move it is, the reason box, and the words
+- **The feed**: one list for the Approvals page and the Inbox's Approvals tab
+
+Any new decision surface should use the same card, the same reason rule, and register itself in the kind registry.
+
+## Request changes and resubmission
+
+When a decider chooses `modify`, the engine:
+
+1. Persists the `request_changes` decision
+2. Sets the active step back to `pending`
+3. Moves the request to `status = 'changes_requested'`
+4. Notifies the author
+
+Resubmission is a new approval cycle, not a voting-round bump. `withdrawForResubmit` closes the old request as `withdrawn`, and the domain route runs `submitApprovalRequest` again with a fresh resolver run. This preserves the snapshot invariant and keeps the submit path unchanged.
+
+## Schema-only, not-yet-runtime features
+
+The following features exist in the schema and resolver but are not yet active at runtime. Do not build product flows that depend on them without confirming activation.
+
+- External magic-link approvers (`external_approver_invitations`, status `awaiting_external`)
+- `parallel_all`, `parallel_any`, `join`, and `wait_delay` routing execution (the executor activates by sequence only today)
+- Escalation re-routing via `escalateToPolicyStepId` (the `slaDueAt` timestamp is written but never read)
+- Pre-expiry SLA warnings (`slaDueAt` is written, never read)
+- `approval_policy_overrides` with no runtime writer
+- Decision kinds `abstain` and `recuse`
+- The Approval Studio Assignments tab
+
+## No-code policy builder
+
+`server/modules/approval-policy/generator.service.ts` generates approval policies from high-level rules. It is used when the platform creates default policies for new institutions or engagements. The builder respects `allow_additional_steps` and locked-step constraints.
+
+## Related pages
+
+- [Curriculum area](/engineering/areas/curriculum)
+- [Teaching and faculty](/engineering/areas/teaching-and-faculty)
+- [Tenancy and authentication](/engineering/foundations/tenancy-and-auth)

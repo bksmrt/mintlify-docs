@@ -1,0 +1,201 @@
+---
+title: "Database and migrations"
+description: "Drizzle ORM conventions, the shared schema, pgvector search, and how schema changes are deployed and recovered."
+sidebarTitle: "Database and migrations"
+---
+
+Proof uses Drizzle ORM with PostgreSQL. Schema changes are applied with `drizzle-kit push` rather than a versioned migration journal. This page covers the canonical schema, pgvector-backed retrieval, the migration workflow, and best practices for writing safe queries.
+
+## Where things live
+
+| File | Purpose |
+| --- | --- |
+| `shared/schema.ts` | Canonical Drizzle schema for all tables, enums, indexes, and relations |
+| `shared/pgvector.ts` | Parsing and serialization helpers for pgvector embeddings |
+| `drizzle.config.ts` | Drizzle-kit configuration |
+| `DRIZZLE_ORM_BEST_PRACTICES.md` | Query patterns and anti-patterns |
+| `docs/schema-migrations.md` | Schema change workflow and CI jobs |
+| `docs/pgvector-migration.md` | Enabling and backfilling pgvector embeddings |
+| `docs/migration-and-db-push.md` | Phase 1 migration notes |
+| `scripts/post-merge-prep.cjs` | Post-merge pgvector extension + index setup |
+| `scripts/unblock-db-push.ts` | Break-glass recovery for enum-recreation blockers |
+
+## Drizzle and the canonical schema
+
+`shared/schema.ts` is the single source of truth for the database. It defines every table, column, enum, index, and relation. When you change the schema, you edit this file and run `npm run db:push` to apply the delta to your dev database.
+
+### Seeded rows
+
+Many tables include `isSeed: boolean("is_seed").notNull().default(false)`. The demo seed script (`scripts/seed-demo-institution.ts`) writes seeded rows with `is_seed = true`. The purge script uses this flag to delete only rows the seed wrote rather than falling back to tenant-scoped deletion. Sixteen tables that previously had no marker gained `is_seed` so the purge never deletes production data.
+
+### Enums
+
+Enums are defined with Drizzle's `pgEnum` helper. Adding a value to an enum should use `ALTER TYPE ... ADD VALUE` in the pushed schema rather than recreating the enum, because recreating an enum that is referenced by indexes or check constraints will block the push. The `unblock-db-push.ts` script drops those blockers when a database has drifted.
+
+## pgvector and retrieval
+
+### Enabling pgvector
+
+The platform supports pgvector-backed nearest-neighbor search for document embeddings. The `scripts/post-merge-prep.cjs` script ensures the pgvector extension exists, normalizes `document_chunks.embedding_vector` to `vector(1536)`, and creates an HNSW index (`document_chunks_embedding_vector_hnsw_idx`, `vector_l2_ops`) for fast search.
+
+### Embedding backfill
+
+After enabling pgvector, run `npm run backfill:embeddings` (idempotent, batched) to copy existing embedding text into the `embedding_vector` column. The script skips malformed entries and reports progress. After backfill, verify with:
+
+```sql
+SELECT count(*) FROM document_chunks WHERE embedding IS NOT NULL AND embedding_vector IS NOT NULL;
+```
+
+### Vector helpers
+
+`shared/pgvector.ts` provides canonical serialization and parsing:
+
+```ts
+import { toVectorLiteral, parseVectorLiteral, cosineSimilarity } from "@shared/pgvector";
+
+// Serialize a number[] to pgvector's text form
+const literal = toVectorLiteral([0.1, 0.2, 0.3]); // "[0.1,0.2,0.3]"
+
+// Parse what node-postgres returns from a vector column
+const vec = parseVectorLiteral(row.embedding_vector);
+
+// Cosine similarity in [-1, 1]
+const sim = cosineSimilarity(vecA, vecB);
+```
+
+The retriever tries pgvector first and falls back to the JSONB+cosine method if pgvector is unavailable.
+
+## Schema changes and deploys
+
+### The push workflow
+
+1. Edit `shared/schema.ts`.
+2. Run `npm run db:push` against your dev database and confirm it applies.
+3. Add a `CHANGELOG.md` entry for every schema or migration change.
+4. Open a PR. Two CI jobs guard the change:
+   - `schema-apply`: applies the full schema to an empty Postgres to prove it is internally consistent.
+   - `schema-upgrade`: applies `main`'s schema first, then pushes your schema onto a populated database. This fails if your change cannot cleanly upgrade an existing DB (for example, an enum recreation blocked by a dependent index or an unsafe column-type change).
+
+Both jobs run on a PR only when it changes what drizzle-kit loads: `shared/schema.ts`, its runtime imports (such as `shared/pgvector.ts`), `drizzle.config.ts`, the migrations folder, or package files. On any other PR they are skipped.
+
+### Deploy-time drift prevention
+
+Every deploy must apply the schema so the database never falls behind the code. Run `npm run db:deploy` (`drizzle-kit push --force`) as part of the deploy pipeline before starting the server. Drift that is not caught at deploy time can cause 500 errors when code references columns that do not yet exist.
+
+### Break-glass recovery
+
+If a database has drifted and `db:push` fails, use the recovery scripts in order:
+
+```bash
+npx tsx scripts/unblock-db-push.ts   # npm run unblock:db-push
+npm run db:push
+```
+
+- `unblock-db-push.ts`: drops partial indexes and check constraints on enum columns that block drizzle's enum recreation, remaps retired enum values, and reports any other out-of-enum values.
+- `fix-notification-type-drift.ts`: converts `notifications.type` from text to the `notification_type` enum.
+- `sync-notification-type-enum.ts`: appends any missing enum values.
+
+Each script is safe to re-run.
+
+## Query best practices
+
+### Never chain `.where()` calls
+
+Drizzle ORM does not support chaining multiple `.where()` calls. Each subsequent call overwrites the previous conditions.
+
+<Warning>
+  The following pattern is broken. Only the last condition is applied.
+</Warning>
+
+```ts
+// Wrong: the institutionId filter is lost
+const results = await db
+  .select()
+  .from(schema.projects)
+  .where(eq(schema.projects.institutionId, institutionId))
+  .where(eq(schema.projects.status, "active"));
+```
+
+Use `and()` to combine conditions:
+
+```ts
+// Correct: both conditions apply
+const results = await db
+  .select()
+  .from(schema.projects)
+  .where(
+    and(
+      eq(schema.projects.institutionId, institutionId),
+      eq(schema.projects.status, "active")
+    )
+  );
+```
+
+### Dynamic WHERE clauses
+
+Build conditions in an array, then combine them once:
+
+```ts
+const conditions = [];
+if (institutionId) {
+  conditions.push(eq(schema.projects.institutionId, institutionId));
+}
+if (status) {
+  conditions.push(eq(schema.projects.status, status));
+}
+
+let query = db.select().from(schema.projects);
+if (conditions.length > 0) {
+  query = query.where(and(...conditions));
+}
+const results = await query;
+```
+
+### Multi-tenancy scoping
+
+Always include `institutionId` as the first filter for tenant-scoped queries:
+
+```ts
+const impacts = await db
+  .select()
+  .from(schema.institutionStatuteImpacts)
+  .where(
+    and(
+      eq(schema.institutionStatuteImpacts.institutionId, institutionId),
+      eq(schema.institutionStatuteImpacts.status, "new"),
+      inArray(schema.institutionStatuteImpacts.agencyId, targetAgencyIds)
+    )
+  );
+```
+
+### Available operators
+
+```ts
+import {
+  eq, ne, gt, gte, lt, lte, like, inArray, notInArray,
+  isNull, isNotNull, and, or, not, between,
+} from "drizzle-orm";
+```
+
+## Backfill scripts
+
+Backfill scripts are idempotent and should be safe to re-run. They typically:
+
+1. Read a batch of rows that need migration.
+2. Transform the data in memory.
+3. Write the result with an `UPDATE` scoped by primary key.
+4. Report progress and skip already-migrated rows.
+
+When you introduce a new column that requires a backfill, include a script under `scripts/` and add an npm alias so it can be run consistently in staging and production.
+
+## Seed and purge
+
+The demo seed script seeds `default-institution` with personas and sample data. It writes `is_seed = true` on every row. The purge script (`--force`) deletes only rows where `is_seed = true`. This ensures that running the seed and purge cycle in a shared dev database never deletes real user data.
+
+The operator curriculum sandbox (`13d89868-...`) is for operator curriculum authoring and is intentionally not seeded.
+
+## Related pages
+
+- [Tenancy and authentication](/engineering/foundations/tenancy-and-auth)
+- [Local development](/engineering/local-development)
+- [Engineering contributing workflow](/engineering/contributing/workflow)

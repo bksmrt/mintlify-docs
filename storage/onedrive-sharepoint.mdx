@@ -1,0 +1,69 @@
+---
+title: "OneDrive and SharePoint"
+description: "Connect Microsoft OneDrive or SharePoint document libraries to Proof through Microsoft Graph and import files as evidence."
+sidebarTitle: "OneDrive and SharePoint"
+---
+
+Proof connects to Microsoft 365 through Microsoft Graph. OneDrive and SharePoint are separate providers in the connect list because they browse different places:
+
+| Provider | What you browse |
+| --- | --- |
+| **OneDrive** | The signed-in user's personal OneDrive. |
+| **SharePoint** | Document libraries on any SharePoint site the signed-in user can access. |
+
+Connect both if your evidence lives in both places.
+
+## Before you start
+
+- Your Proof administrator must have configured the Microsoft Graph OAuth client. Both providers use the same client, so they are available or unavailable together.
+- Your Microsoft 365 tenant may require an administrator to approve Proof before users can consent. If sign-in stops with an approval message, ask your Microsoft 365 administrator to grant consent.
+
+## Permissions Proof requests
+
+| Scope | Why Proof needs it |
+| --- | --- |
+| `Files.Read.All` | Read files the user can access, including OneDrive and SharePoint libraries. |
+| `Sites.Read.All` | List SharePoint sites and their document libraries. |
+| `User.Read` | Show which Microsoft account the connection belongs to. |
+| `offline_access` | Keep the connection working by refreshing access tokens. |
+
+All scopes are read-only. Proof never changes or deletes your Microsoft 365 files.
+
+## Connect
+
+<Steps>
+  <Step title="Open the import dialog">
+    In a project's evidence tab, click **Import from cloud**, then choose **OneDrive** or **SharePoint**.
+  </Step>
+  <Step title="Sign in to Microsoft">
+    Sign in with your work or school account and approve the requested permissions.
+  </Step>
+  <Step title="Pick the connection">
+    The connection appears with your account email. Select it to start browsing.
+  </Step>
+</Steps>
+
+## Browse OneDrive
+
+Browsing starts at the root of your OneDrive, shown as **Files**. Open folders to navigate, then click **Import** next to a supported file.
+
+## Browse SharePoint
+
+SharePoint browsing has extra levels before you reach files:
+
+1. **Sites**: every SharePoint site your account can access.
+2. **Libraries**: the document libraries on the selected site, such as **Documents**.
+3. **Folders and files**: the contents of the selected library.
+
+<Tip>
+  If a site is missing from the list, confirm your Microsoft account has at least read access to it in SharePoint.
+</Tip>
+
+## Supported files
+
+PDF, Word (`.docx`), Excel (`.xlsx`, `.xlsm`), CSV, and text files can be imported. Legacy Office formats (`.doc`, `.xls`) and PowerPoint files appear in the browser but are marked **Unsupported**. Save them in a supported format first. See [Which files can be imported](/storage/overview#which-files-can-be-imported).
+
+## Related
+
+- [Document storage overview](/storage/overview)
+- [Troubleshooting storage connections](/storage/troubleshooting)

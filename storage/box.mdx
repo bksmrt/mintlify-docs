@@ -1,0 +1,46 @@
+---
+title: "Box"
+description: "Connect a Box account to Proof and import files from Box folders as evidence."
+---
+
+Connect a Box account to browse your Box folders and import documents into a project's evidence library.
+
+## Before you start
+
+- Your Proof administrator must have configured the Box OAuth client. If not, Box shows as unavailable in the connect list.
+- Any member of your institution can connect an account from the **Import from cloud** dialog in a project's evidence tab.
+
+## Connect and import
+
+<Steps>
+  <Step title="Open the import dialog">
+    In a project's evidence tab, click **Import from cloud**, then choose **Box**.
+  </Step>
+  <Step title="Approve access">
+    Sign in to Box and grant Proof access. The connection shows your Box login email once it is ready.
+  </Step>
+  <Step title="Browse your files">
+    Browsing starts at **All Files**. Open folders to navigate, and use the breadcrumb trail to go back.
+  </Step>
+  <Step title="Import a file">
+    Click **Import** next to a supported file. The file appears in the evidence tab when processing finishes.
+  </Step>
+</Steps>
+
+## How Proof decides what can be imported
+
+Box does not report a file type, so Proof uses the file extension:
+
+| Extension | Importable |
+| --- | --- |
+| `.pdf`, `.docx`, `.xlsx`, `.xlsm`, `.csv`, `.txt`, `.md` | Yes |
+| Anything else | No, shown as **Unsupported** |
+
+<Warning>
+  A file with the wrong extension (for example, a PDF saved without `.pdf`) shows as unsupported. Rename it in Box, then refresh the folder.
+</Warning>
+
+## Related
+
+- [Document storage overview](/storage/overview)
+- [Troubleshooting storage connections](/storage/troubleshooting)

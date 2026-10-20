@@ -1,0 +1,111 @@
+---
+title: "Visual language"
+description: "The settled marks and meaning rules that govern every line, weight, wash, and glyph in Proof's interface."
+sidebarTitle: "Visual language"
+---
+
+Proof's visual language is a contract: one meaning per mark, everywhere. It governs underlines, weight, washes, glyphs, links, and standard names across the product. The rules are decided and enforced through the marks module, a CI ratchet, and a growing test suite.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Marks grammar (meaning to look) | `client/src/lib/proof/marks.ts` |
+| Mark component | `client/src/components/proof/Mark.tsx` |
+| Mark stylesheet | `client/src/components/proof/Mark.css` |
+| Standard name component | `client/src/components/proof/StandardName.tsx` |
+| Standard name stylesheet | `client/src/components/proof/StandardName.css` |
+| Marks tests | `client/src/lib/__tests__/proof-marks.test.ts` |
+| Component mark tests | `client/src/components/__tests__/proof-mark.test.tsx` |
+| vl-marks ratchet | `scripts/__tests__/vl-marks.ratchet.test.ts` + `vl-marks.baseline.json` |
+| Standard census | `docs/design/visual-language/standard-census.md` |
+| Code census | `docs/design/visual-language/code-census.md` |
+| Decision census | `docs/design/visual-language/decisions-census.md` |
+
+## Settled rules
+
+These rules are the owner's decided framework. Every mark on prose is drawn through the module keyed on meaning.
+
+| Rule | Means |
+| --- | --- |
+| **VL-R1** | A dashed line means open: someone still has to act. |
+| **VL-R2** | Weight means emphasis: bold is the figure or the word that matters, never a link, never a state, never a label. |
+| **VL-R2a** | In a policy sentence, the operative clause (obligation + comparator + value) is emphasized via the existing constraint primitives. |
+| **VL-R3** | Dashed slate means open and not yet read (no verdict yet). Once read and quiet, the same line goes solid slate. Amended by VL-R5a: read and quiet now wears a ghost slate box with no line. |
+| **VL-R4** | A link is ink text at normal weight, a thin dotted underline, and the source glyph before it (a record or a section). No color of its own. A verb inside a sentence that opens a field in place is the dotted word alone, no glyph. |
+| **VL-R5** | A solid line means settled: the sentence is held to a requirement and nothing about it is open. Amended by VL-R5a: a settled passage wears no line, only a ghost box. |
+| **VL-R5a** | A settled passage wears a ghost box (hairline outline at 45% tone): sage with its checkmark when affirmed, slate with no checkmark when it asks nothing. The solid slate line it frees means advisory: worth a look, blocks nothing. |
+| **VL-R6** | The wash means act here and appears only under a clay mark. Resolved, quiet, and unread sentences carry a line only (or a ghost box). |
+| **VL-R7** | A citation in analysis prose is a link in the VL-R4 look with its source glyph. |
+| **VL-R8** | The checkmark means resolved and nothing else. Recorded, confirmed, sent, done, and test passed wear words or stamps, never the tick. |
+| **VL-R9** | The sparkle means ask the model for a suggestion you accept or dismiss. Analysis prose is headed with a fold idiom and never wears the sparkle. |
+| **VL-R10** | Color on a mark says whose move it is, never whether it is open: clay is needs you, oak is awaits confirmation, slate is no verdict yet or asks nothing, sage is affirmed, oxblood is stopped. Amended by VL-R5a: slate asking nothing is a ghost box, not a line. |
+| **VL-R11** | Right arrow means goes somewhere inside the product; diagonal arrow means goes somewhere outside; a control that writes wears no arrow. |
+| **VL-R12** | A wavy line is a writing note: the words could be written better, and it asks for no compliance move. Violet, the palette's "a note." |
+| **VL-R13** | A compare between two versions draws the change on the newer text: removed words are struck, added words wear the staged addition's wash. Only inside a compare; never a state mark on a reading. |
+| **VL-R14** | A faded sentence is a draft: words the model drafted that are not the college's text until someone writes them in. Sparkle before it, faded ink on a dashed clay line, no wash, no box. |
+| **VL-R15** | A struck sentence is leaving: words of the college's text that a person marked to go and not yet saved away. It wears the removed look in the text itself. |
+| **VL-R16** | A briefcase holding initials is a consulting firm's hand. It says who wrote it, never whose move it is. It takes no tone and never replaces the change's own marks. |
+| **VL-R17** | A standard's name is one frame: an unfilled square frame in ink-soft, square corners, no fill, the register's caps face. It is never toned and never underlined. Where the standard opens, the words beside it do, or the frame itself keeps its door with no link mark. |
+
+## The marks module
+
+`client/src/lib/proof/marks.ts` exports `MarkMeaning`, `markLook`, `markAttrs`, `sourceGlyph`, `arrowFor`, `readingMeaning`, and `standardNameParts`. The meaning-to-look table is the canonical mapping.
+
+```typescript
+const LOOK: Record<MarkMeaning, MarkLook> = {
+  open:      { state: "open",     line: "dashed", tone: "clay",    wash: true,  tick: false },
+  unread:    { state: "open",     line: "dashed", tone: "slate",   wash: false, tick: false },
+  awaiting:  { state: "open",     line: "dashed", tone: "oak",     wash: false, tick: false },
+  stopped:   { state: "open",     line: "dashed", tone: "oxblood", wash: false, tick: false },
+  advisory:  { state: "advisory", line: "solid",  tone: "slate",   wash: false, tick: false },
+  resolved:  { state: "settled",  line: "box",    tone: "sage",    wash: false, tick: true  },
+  quiet:     { state: "settled",  line: "box",    tone: "slate",   wash: false, tick: false },
+  link:      { state: "link",     line: "dotted", tone: null,     wash: false, tick: false },
+  note:      { state: "note",     line: "wavy",   tone: "violet",  wash: false, tick: false },
+  draft:     { state: "open",     line: "dashed", tone: "clay",    wash: false, tick: false, faded: true },
+};
+```
+
+`<Mark meaning=...>` draws the line. It does not set weight. Weight is set by the caller via the constraint primitives for operative clauses, or by plain markup for emphasis in non-policy prose.
+
+## Standard names
+
+`StandardName` draws a standard's code in the one agreed frame. `standardNameParts(code, agency)` returns `{ agency, code }`. The agency's short name rides with the data: `GET /api/projects/:id/agency-standards` carries `agencyAbbreviation`; the catalog and Certification Studio read their agency's own. An obligation cite that names no agency shows the code alone until the payload carries it.
+
+## The ratchet
+
+`scripts/__tests__/vl-marks.ratchet.test.ts` counts every hand-rolled underline, bottom border, and Tailwind utility outside the module. It matches:
+
+- CSS `text-decoration` with underline
+- Inline `textDecoration` with underline
+- CSS `text-decoration-style` dotted or dashed
+- Inline `textDecorationStyle` dotted or dashed
+- Tailwind `underline` and variants
+- Bottom borders that are dotted, dashed, or solid at 2px and over
+
+It ignores solid borders under 2px (structure rules), transparent borders, comments, and lines labeled `vl-structure:`.
+
+When the count reaches zero, a second style guide can be added as a second table with no surface changes.
+
+## Testing
+
+Two test suites hold the rules:
+
+- `client/src/lib/__tests__/proof-marks.test.ts`: every open meaning is dashed, every settled is a box, wash only with clay, checkmark only on resolved, link dotted with no color.
+- `client/src/components/__tests__/proof-mark.test.tsx`: the stylesheet agrees with the module; `readingMeaning` covers every reading the server can produce.
+
+## Rules and gotchas
+
+- **Never hand-roll an underline.** If a passage needs a line, use `<Mark meaning=...>`. If the module does not cover the case, extend the module or use a structure rule with a `vl-structure:` label, never a raw border.
+- **A standard's name never wears a link mark.** The frame is the door; where words beside it open the standard, those words carry the dotted link look.
+- **Weight is set by the caller, not by the mark.** The mark carries line, tone, wash, and tick only.
+- **The ghost box is drawn by `data-line="box"` in `Mark.css`.** It is a 1px hairline at 45% opacity. Do not reimplement it with inline styles.
+- **Firm initials in the briefcase are grey ink.** They say who wrote a suggestion, not whose move it is. Do not tone them.
+- **The Evans felt-and-paper tokens are parallel.** Do not mix them with Proof tokens on the same page. See `docs/areas/mockup-sandbox.md` for Evans rules.
+
+## Related pages
+
+- [Proof Kit](/engineering/design/proof-kit)
+- [Curriculum](/engineering/areas/curriculum)
+- [Sections](/engineering/areas/sections)

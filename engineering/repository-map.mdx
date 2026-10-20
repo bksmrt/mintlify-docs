@@ -1,0 +1,113 @@
+---
+title: "Repository map"
+description: "Where everything lives in the Proof monorepo, from server routes to client pages to shared schema."
+---
+
+The Proof repo is a single TypeScript monorepo with one Express server, one React SPA, and a shared package that both sides import. This page is a quick-reference for where to look when you need to touch a new surface.
+
+## Top-level directories
+
+| Directory | What it holds |
+| --- | --- |
+| `client/` | React SPA (Vite, TypeScript, Tailwind) |
+| `server/` | Express app, API routes, domain modules, workers |
+| `shared/` | Drizzle schema, Zod types, enums, business logic that both sides need |
+| `migrations/` | Ad-hoc SQL scripts and the frozen drizzle meta directory |
+| `scripts/` | One-off scripts, backfills, smoke tests, check ratchets |
+| `script/` | Build and seed scripts (`build.ts`, `seed-accreditors.ts`) |
+| `docs/` | Repo-owned architecture docs (`docs/areas/*.md`, design contracts) |
+| `playwright/` | End-to-end Playwright specs |
+| `.github/workflows/` | CI workflows (unit tests, branch hygiene, Playwright) |
+
+## Server layout
+
+The server is organized around an entrypoint, shared infrastructure, domain modules, and background workers.
+
+### Entrypoint and shared server files
+
+| File | Purpose |
+| --- | --- |
+| `server/index.ts` | Express app bootstrap: middleware, route registration, worker startup |
+| `server/routes.ts` | API route mounting and the `registerRoutes` closure contract |
+| `server/db.ts` | Drizzle client and pool management |
+| `server/static.ts` | Static asset serving (the built client) |
+| `server/storage.ts` | File storage abstraction |
+
+### Domain modules (`server/modules/*`)
+
+These are grouped by business domain. Notable modules include:
+
+| Module | Purpose |
+| --- | --- |
+| `ai-routing` | LLM router, embedding client, model registry, retry logic |
+| `approval-policy` | Dynamic Approval Framework engine and policy builders |
+| `compliance-resolver` | Suggestion settlement, reconciliation, and compliance workspace logic |
+| `curriculum-*` | Curriculum proposals, validators, hierarchy, exceptions, recommendations |
+| `ethos` | Ethos defaults, presets, and the binding-vs-default contract |
+| `evidence-matching` | RAG retriever and hybrid evidence matching |
+| `integrations` | SIS connectors, field mapping, sync, and writeback |
+| `narrative-*` | Narrative intelligence, readings, reconciliation, suggestions |
+| `rag` | Chunking, indexing, and vector search plumbing |
+| `regulatory-intelligence` / `regulatory-sync` | Agency parser registry, catalog ingestion, source monitoring |
+| `reporting` | Audit trail, report generation, and saved reports |
+| `reports-ask` | Conversational report entry and portfolio query synthesis |
+| `scoring` | ICI engine, peer snapshots, and readiness scoring |
+| `section-recommendations` | Section room and meeting-pattern rankers |
+| `student-match` | Prerequisite-aware student-to-section matching |
+| `teaching-match` / `teaching-metrics` | Workload Studio scheduling and faculty metrics |
+| `validation-exemptions` | Shared exemption core for course, program, and section validation |
+| `workload-recommendations` | Workload advisor and constraint engine |
+
+### Workers and queues
+
+| Directory / file | Purpose |
+| --- | --- |
+| `server/workers/` | Background worker entrypoints: parser, SIS sync, SIS writeback, ICI recompute, regulatory parser |
+| `server/webhooks/` | Webhook delivery worker, emitter, and signature signer |
+| `server/sso/` | SSO route handlers, WorkOS integration, role evaluation, session revocation |
+| `server/billing/` | Stripe checkout, webhooks, promo grants, and billing notifications |
+
+## Client layout
+
+| Directory | Purpose |
+| --- | --- |
+| `client/src/pages/` | Top-level page components (one per route) |
+| `client/src/components/` | Shared and domain-specific React components |
+| `client/src/hooks/` | Custom TanStack Query hooks and local state hooks |
+| `client/src/lib/` | Utilities, proof design tokens, marks, tabs, and query client setup |
+| `client/src/modules/` | Domain-specific client modules mirroring server domains |
+| `client/src/App.tsx` | Route declarations and `<Route>` entries |
+
+Key conventions on the client side:
+
+- The canonical list style is defined in `docs/design/register-canonical.md` and enforced by tests. Never hand-roll a new list frame.
+- Marks (underlines, washes, glyphs) are drawn by `components/proof/Mark.tsx` from `client/src/lib/proof/marks.ts`. The ratchet test `scripts/__tests__/vl-marks.ratchet.test.ts` counts hand-rolled marks and only allows the count to fall.
+- The journal tab bar and large masthead are shared across pages; see `client/src/lib/proof/tabs.ts`.
+
+## Shared package
+
+`shared/` is imported by both server and client via path aliases (`@shared`, `@shared/schema`). The most important file is `shared/schema.ts`: it is the single source of truth for every table, enum, and relation in the database. Both sides also share:
+
+- Validation constants (`upload-limits.ts`, `constraint-primitives.ts`)
+- Business rules (`governance.ts`, `ethos-policy.ts`, `program-constraints.ts`)
+- Type-safe routing helpers (`workspace-href.ts`)
+
+## Repo docs
+
+The repo carries its own living documentation under `docs/`:
+
+| File / directory | When to read it |
+| --- | --- |
+| `docs/areas/core-shared.md` | Cross-cutting concerns: routes, schema, tenancy, approvals, narrative model |
+| `docs/areas/curriculum.md` | `/curriculum/*` routes and the curriculum sidebar group |
+| `docs/areas/sections.md` | Section wizard, smart-picker, validation, and reserved-seat audience catalog |
+| `docs/areas/teaching-scheduling-faculty.md` | Workload Studio, `/my-teaching`, faculty invitations, metrics |
+| `docs/areas/instructional-standards.md` | Per-course instructional-minutes floors and agency-standards freshness |
+| `docs/areas/suggestions-cockpits.md` | Cockpit mirrors: student suggestions, section rooms, meeting patterns, advisor chat |
+| `docs/areas/integrations-and-retrieval.md` | SIS integrations CRUD and the RAG retriever |
+| `docs/areas/ethos.md` | Ethos defaults, presets, consumption map, and sweep recipes |
+| `docs/areas/proof-kit.md` | Proof editorial design kit: tokens, marks, type, art-direction rules |
+| `docs/areas/task-resolution-map.md` | Work-task types, resolution archetypes, and mismatch list |
+| `docs/bksmrt-write-policy.md` | Full three-bucket write policy for the operator role |
+| `docs/schema-migrations.md` | How schema changes are made, deployed, and recovered |
+| `CLAUDE.md` | Agent guardrails: redesign governance, PR discipline, question register |

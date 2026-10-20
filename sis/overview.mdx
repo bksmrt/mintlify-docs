@@ -1,0 +1,83 @@
+---
+title: "SIS integrations overview"
+description: "Connect Proof to your institution's SIS to keep curriculum, faculty, and term data in sync."
+sidebarTitle: "Overview"
+---
+
+Proof connects to your institution's Student Information System (SIS) to pull curriculum and faculty data into the accreditation workflow. Proof is not an SIS: it never stores students, grades, enrollments, or registration records. The integration reads a mirror of courses, departments, programs, terms, and faculty, while your SIS remains the system of record.
+
+## What syncs and what does not
+
+Proof pulls select data sets from an SIS and stamps each record with provenance so you always know which rows came from an external source. Records created or updated from a sync show a provenance marker (for example, the courses index shows "from SIS").
+
+| Direction | Data that syncs | Data that does not sync |
+| --- | --- | --- |
+| Into Proof | Courses, departments, academic programs, terms, faculty | Students, grades, enrollments, registration, sections, schedules |
+| Back to SIS (optional) | Approved changes to courses, programs, departments, prerequisites, requirement groups | Any new SIS records (writeback updates only) |
+
+## Supported vendors
+
+Proof supports direct connections to several SIS vendors. Each vendor has a status that indicates whether it is fully available, available in beta, or planned for a future release.
+
+| Vendor | Status | Authentication | Data modules |
+| --- | --- | --- | --- |
+| SFTP / CSV Drop | Active | SFTP (host, username, password, or key) | Curriculum, faculty |
+| Ellucian Banner | Beta | API token or OAuth2 | Curriculum, institutional profile, evidence, faculty |
+| Ellucian Colleague | Beta | API token | Curriculum, institutional profile, faculty |
+| Workday Student | Beta | OAuth2 | Curriculum, institutional profile, faculty |
+| Oracle PeopleSoft Campus Solutions | Coming soon | API token | Curriculum, institutional profile, faculty |
+| Jenzabar One | Coming soon | API token | Curriculum, institutional profile, faculty |
+
+Vendors marked **beta** are implemented against documented vendor APIs but have not yet been validated end to end against a live sandbox. Vendors marked **coming soon** are registered as placeholders and cannot yet run syncs.
+
+## Who can configure an SIS connection
+
+Configuring an SIS integration is limited to people with the appropriate role at your institution.
+
+- **Institutional admins** can create, edit, disconnect, and delete connections.
+- **Compliance officers** can view connection status and run reports. An institutional admin can also grant a compliance officer explicit permission to manage SIS connections by name.
+- **Other roles** (faculty, department heads, auditors, students) cannot access the integration screens.
+
+Consulting firms that work with your institution can view a read-only summary of connections from the engagement page, but they cannot create or modify them.
+
+## Connection lifecycle
+
+Setting up an SIS connection on Proof follows five stages: connect, map, test, schedule, and review.
+
+<Steps>
+  <Step title="Connect">
+    Go to **Settings > Integrations** (or the institution admin panel) and choose your SIS vendor. Provide the vendor credentials, such as an SFTP host or an API token, and select the data modules you want to sync (for example, curriculum and faculty).
+  </Step>
+  <Step title="Map">
+    Proof shows a guided field-mapping editor with sample rows from your SIS. Match each vendor field, such as `course_number` or `subject`, to the corresponding Proof field. You can override transforms (for example, trim whitespace or uppercase a code) per field.
+  </Step>
+  <Step title="Test">
+    Run a test sync to validate credentials, field mappings, and row counts. A test sync is recorded as a dry run: it fetches data and previews what would change, but it does not write to your live Proof catalog.
+  </Step>
+  <Step title="Schedule">
+    Enable a recurring schedule so syncs run automatically. You can choose daily, weekly, or hourly cadences and set a preferred time of day. You can also run a one-time manual sync whenever you need it.
+  </Step>
+  <Step title="Review runs">
+    Each sync generates a run report with counts for created, updated, skipped, archived, and errored records. Open any run to inspect per-record outcomes and error messages.
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SFTP / CSV Drop" href="/sis/sftp-csv">
+    Set up a nightly CSV file drop over SFTP. This is the only fully active SIS path today and works with any SIS that can export CSV files.
+  </Card>
+
+  <Card title="Vendor connectors" href="/sis/vendor-connectors">
+    Learn the credentials and configuration steps for Ellucian Banner, Colleague, Workday, and other vendor APIs.
+  </Card>
+
+  <Card title="Sync and field mapping" href="/sis/sync-and-mapping">
+    Understand how the sync engine processes records, how conflict resolution works, and how to read run reports.
+  </Card>
+
+  <Card title="Writeback" href="/sis/writeback">
+    Send approved catalog changes back to your SIS. Covers prerequisites, requirements, and course updates.
+  </Card>
+</CardGroup>

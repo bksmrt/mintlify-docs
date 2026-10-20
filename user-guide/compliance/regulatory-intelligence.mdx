@@ -1,0 +1,128 @@
+---
+title: "Regulatory Intelligence"
+sidebarTitle: "Regulatory Intelligence"
+description: "Monitor detected regulatory changes, classify their impact, and escalate them into compliance projects."
+---
+
+Regulatory Intelligence is your institution's watch room for external rule changes. It collects updates from monitored sources, classifies each change by magnitude and confidence, and gives you a clear path from detection to action.
+
+## How to get here
+
+Click **Regulatory Intelligence** in the sidebar.
+
+## What you see
+
+The page opens as a journal with five leaf tabs across the top.
+
+### Needs Attention
+
+A curated feed of items that require a human decision. This includes detected changes that are not yet acknowledged, high-impact findings, and anything the system cannot auto-resolve.
+
+### Regulatory Changes
+
+A register of hand-entered or imported regulatory changes. Each row shows:
+
+- **Change**: title and description
+- **Status**: Detected, Under Review, Action Required, or Resolved
+- **Effective**: the effective date
+- A row menu with **View Details**, **View Source** (when a source link exists), and **Acknowledge** (until acknowledged)
+
+Above the register, a stats line shows **Total**, **Detected**, **Action Required**, and **Resolved** counts. Click the notices link to see changes that need no action.
+
+#### Filters
+
+Click **Filters** to narrow by:
+
+- **Status**: Detected, Under Review, Action Required, Resolved
+- **Level**: Federal, State, Regional, Local, Institutional
+- **Impact**: Critical, High, Medium, Low
+- **Kind**: Findings (needs action) or Notices (no action needed)
+- **Acknowledged**: yes or no
+- **Record State**: draft, active, or archived
+
+Click **Add Change** to create a new regulatory change manually.
+
+### Detected Updates
+
+A feed of automatically detected updates from monitored sources. Each entry shows:
+
+- **New** tag if first seen within the last 72 hours
+- **Curation status**: Pending Review, In Review, Approved, Published, or Archived
+- **Entry type**: Document, Policy Update, Announcement, News, or Update
+- **Source name**
+- **Classification badge**: the system's assessed magnitude and confidence
+- **Title**, **date**, and **description**
+
+#### Actions per entry
+
+- **Source**: open the original external link
+- **Acknowledge**: mark the entry as reviewed (for minor or routine changes)
+- **Dismiss**: archive the entry
+- **Override ↑**: escalate the entry into a compliance project even if the system classified it as minor
+- **Create Project**: for entries classified as major, create a project directly
+- **Trace**: expand the entry to see detection reasoning, source type, content signature, and source URL
+
+#### Classification review
+
+Click the classification badge on any entry to review or override its magnitude. You can change it to minor, moderate, or major, and add a justification. Once an entry is approved, archived, or published, its classification is locked.
+
+#### Feed filters
+
+Filter detected updates by source, new only, status, and type. A search field also lets you filter by title or description.
+
+#### Policy linking banner
+
+If your institution has not yet linked policies to compliance rules, a banner appears at the top of the feed. It guides you to:
+
+1. Add policies in the Policy Inventory
+2. Add compliance rules in the Compliance Registry
+3. Link policies to rules
+
+Until linking is complete, only document-type entries are shown.
+
+### Control Health
+
+Every monitored standard with its control health. Filter by status, sort by payoff, and accept or dismiss Proof's suggestions for each standard.
+
+### Decay
+
+How fresh your policies, evidence, and documents are, so you can see what is going stale.
+
+### Corpus freshness strip
+
+At the very top of the page, a trust layer shows how current the detection signal is. If catalog updates are available, a note appears with a link to the Sync Station.
+
+## What you can do here
+
+- **Acknowledge a minor change**: click **Acknowledge** on a detected update to record that it has been reviewed
+- **Escalate to a project**: click **Override ↑** or **Create Project** to turn a change into a tracked compliance project with an owner and tasks
+- **Classify manually**: click the classification badge to override the system's assessment
+- **Dismiss noise**: click **Dismiss** to archive entries that do not require action
+- **Add a manual change**: click **Add Change** on the Regulatory Changes tab to record a change the system did not detect
+- **Trace provenance**: click **Trace** on any detected entry to see exactly how and when it was found
+
+## Common tasks
+
+<CardGroup cols={2}>
+  <Card title="Respond to a regulatory change" icon="zap" href="/user-guide/compliance/how-to/respond-to-regulatory-change">
+    Acknowledge, escalate, or resolve a detected change step by step.
+  </Card>
+
+  <Card title="Update a policy" icon="book-open" href="/user-guide/compliance/how-to/update-a-policy">
+    Revise an institutional policy to address a new regulatory requirement.
+  </Card>
+
+  <Card title="Schedule and complete a review" icon="calendar" href="/user-guide/compliance/how-to/schedule-a-review">
+    Set review deadlines so policy coverage stays current.
+  </Card>
+
+  <Card title="Collect policy readings" icon="list-checks" href="/user-guide/compliance/how-to/collect-policy-readings">
+    Record confirmations and flags against compliance standards.
+  </Card>
+</CardGroup>
+
+## Related
+
+- [Compliance Registry](/user-guide/compliance/compliance-registry)
+- [Policy Inventory](/user-guide/compliance/policy-inventory)
+- [Review Calendar](/user-guide/compliance/review-calendar)

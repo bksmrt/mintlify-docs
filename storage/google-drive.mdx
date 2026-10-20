@@ -1,0 +1,64 @@
+---
+title: "Google Drive"
+description: "Connect a Google Drive account to Proof and import files, including Google Docs, Sheets, and Slides, as evidence."
+---
+
+Connect a Google Drive account to browse your Drive and import compliance documents into a project's evidence library.
+
+## Before you start
+
+- Your Proof administrator must have configured the Google Drive OAuth client. If not, Google Drive shows as unavailable in the connect list.
+- Any member of your institution can connect an account from the **Import from cloud** dialog in a project's evidence tab.
+
+## Permissions Proof requests
+
+When you connect, Google asks you to approve these scopes:
+
+| Scope | Why Proof needs it |
+| --- | --- |
+| `drive.readonly` | Browse folders and download files. Proof never writes to, moves, or deletes your Drive files. |
+| `openid`, `email`, `profile` | Show which Google account the connection belongs to. |
+
+Proof requests offline access, so the connection keeps working after your session ends. Access tokens refresh automatically.
+
+## Connect and import
+
+<Steps>
+  <Step title="Open the import dialog">
+    In a project's evidence tab, click **Import from cloud**, then choose **Google Drive**.
+  </Step>
+  <Step title="Approve access">
+    Sign in to Google and approve the requested permissions. Google always shows the consent screen, even if you approved Proof before.
+  </Step>
+  <Step title="Browse your Drive">
+    Browsing starts at **My Drive**. Open folders to navigate, and use the breadcrumb trail to go back. Items in the trash are hidden.
+  </Step>
+  <Step title="Import a file">
+    Click **Import** next to a supported file. The file appears in the evidence tab when processing finishes.
+  </Step>
+</Steps>
+
+## Google-native files
+
+Google Docs, Sheets, and Slides have no downloadable file of their own, so Proof exports them during import:
+
+| Google file type | Imported as |
+| --- | --- |
+| Google Docs | Plain text (`.txt`) |
+| Google Sheets | CSV (`.csv`) |
+| Google Slides | Plain text (`.txt`) |
+
+Exported files keep the original name with the new extension added. Formatting, images, and comments are not preserved. For Sheets, only cell values are kept.
+
+<Tip>
+  If formatting matters for review, export the document to PDF in Google Drive first, then import the PDF.
+</Tip>
+
+## Other supported files
+
+Uploaded files such as PDF, Word (`.docx`), Excel (`.xlsx`, `.xlsm`), CSV, and text files import as they are. See [Which files can be imported](/storage/overview#which-files-can-be-imported).
+
+## Related
+
+- [Document storage overview](/storage/overview)
+- [Troubleshooting storage connections](/storage/troubleshooting)

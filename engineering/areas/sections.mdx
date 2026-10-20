@@ -1,0 +1,103 @@
+---
+title: "Sections"
+description: "Section identifiers, the section wizard, smart-picker, validation diagnostics, numbering, and the right-rail detail panel."
+sidebarTitle: "Sections"
+---
+
+The sections domain covers section creation, numbering, validation, and the UI surfaces that help schedulers build a schedule of classes. The central architectural concern is the three-identifier discipline: every section carries `id`, `sectionId`, and `sectionNumber` with non-overlapping jobs.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Section routes and renumber engine | `server/sectionRoutes.ts` |
+| Section validation engine | `server/sectionValidationService.ts` |
+| Section storage | `server/sectionStorage.ts` |
+| Section write-error mapping | `server/sectionWriteErrors.ts` |
+| SmartPicker component | `client/src/components/sections/smart-picker.tsx` |
+| Section wizard diagnostic components | `client/src/components/sections/envelope-hints.tsx` |
+| Right-rail section detail panel | `client/src/components/sections/section-detail-panel.tsx` |
+| Section ID helpers | `shared/section-id.ts` |
+| Linked-section naming helpers | `shared/linked-sections.ts` |
+| Scheduler role gate | `client/src/lib/role-gates.ts` (`isSchedulerRole`) |
+| Course row resolution | `server/courseRowResolution.ts` |
+| Catalog year resolution | `shared/catalog-year-resolution.ts` |
+| Section numbering lifecycle | `docs/section-numbering.md` |
+
+## Three identifiers
+
+Every section carries three distinct identifiers:
+
+1. **`sections.id`** (UUID, primary key): the algorithmic key. Every foreign key, join, matcher, eligibility check, and instructional-standards lookup keys off this. It is never user-visible.
+2. **`sections.sectionId`** (`OOOOOOLL-NNNNNN`, 15 chars, `varchar(15)` unique): the stable internal handle. The server assigns this in the same transaction as insert via `section_id_counters`; it is never accepted from API callers. The format is an 8-digit federal OPE ID (or reserved `99NNNNNN` for tenants without one) plus a 6-digit per-institution counter starting at 100000. Helpers live in `shared/section-id.ts`.
+3. **`sections.sectionNumber`** (`varchar(50)`, nullable until assigned): the display label only. Auto-assigned values are 3-digit `001...999`. The registrar may set custom values (for example, `HONORS-1`, `ONLINE-A`, `EVE-1`, `001H`) on draft or pending-approval sections, and these survive every renumber pass.
+
+**The rule: join algorithmically by `sections.id`, reference internally by `sections.sectionId`, display by `sections.sectionNumber` only.**
+
+### The custom-convention contract
+
+`isAutoStyleSectionNumber` in `shared/section-id.ts` matches only the bare 3-digit zero-padded auto pattern. Anything else is treated as a custom convention and preserved across renumbers. Custom values may be set on `draft` or `pending_approval` rows; `published`, `cancelled`, and `locked` rows are frozen regardless.
+
+## Renumbering
+
+The renumber engine `runCohortRenumber` in `server/sectionRoutes.ts` is the single source of truth. It is triggered in three ways:
+
+1. **Manual**: `POST /api/sections/process-numbers` (button on `/schedule-of-classes`, relabeled "Re-process section numbers now")
+2. **Approval-time**: post-commit hook on `pending_approval → scheduled` runs `POST /api/sections/:id/approve`
+3. **Nightly sweep**: `section_renumber_sweep` in `server/schedulerService.ts`
+
+All three call the same engine. Sort key is `[earliestDayOfWeek (M=0...U=6), earliestStartTime, createdAt, id]`. Earliest weekday wins over earliest time of day.
+
+The cohort reassignment uses a two-phase write inside a transaction: Phase A assigns temporary values (`__t-<8 hex chars>`), then Phase B writes the final numbers. This avoids unique-index collisions mid-shuffle. If no assignments change, the transaction is skipped entirely.
+
+### Capacity and exhaustion
+
+There is a hard cap of 999 auto-numbered sections per `(course, term)` cohort. When eligible rows would exceed the range, the engine returns `exhausted=true`. The manual route responds with `409 section_number_exhausted`; approval-time and nightly paths record the exhaustion as a warning rather than failing. Approval-time renumber failures are non-fatal to the approval itself. They are surfaced via `GET /api/sections/renumber-warnings?termId=...` as a small chip on `/schedule-of-classes`.
+
+## Course identity and historical row resolution
+
+Course identity uses a partial unique index on `(institutionId, subject, courseNumber) WHERE recordState='active'`. A section pinned to an older `courseVersion` must resolve the same historical row in both the publish-time validator and the recommendation engine, or suggestions will block candidates that publish would accept.
+
+`server/courseRowResolution.ts` is the single implementation. It disambiguates through the section's term to that term's persisted `catalog_year_id`. It reads the stored year only; deriving one from dates would silently pick a different row (and a different instructional-minutes floor) than the Catalog Years page shows. Any new consumer must call this helper rather than re-implementing the lookup.
+
+## Validation
+
+The section validation engine in `server/sectionValidationService.ts` emits `SEC_*` diagnostics. Key checks include:
+
+- Schedule type rules (`SEC_SCHEDULE_TYPE_FORMAT_MISMATCH`, `SEC_SCHEDULE_TYPE_MEETING_COUNT`, `SEC_SCHEDULE_TYPE_DAY_PATTERN`): institution-specific deltas on meeting patterns, authored in Workload Studio
+- Instructional minutes floors (`SEC_INSTRUCTIONAL_FLOOR_*`): layered precedence of agency, institution, course, and Carnegie fallback
+- Modality mix (`SEC_MODALITY_MIX_BELOW_MIN`, `SEC_MODALITY_MIX_ABOVE_MAX`): contact hours must be delivered in the right mode per meeting pattern
+- Section-within-term containment (`SEC_DATES_OUTSIDE_TERM`): reads `part_of_term_*` dates only
+- Contact hours per week (`SEC_CONTACT_HOURS_LOOK_PER_WEEK`): advisory when a course's `contactHours` looks like a per-week value
+
+The validator consumes `resolveInstructionalStandards(...)` from `server/modules/instructional-standards/resolver.ts`, the single sanctioned read for per-course instructional-minutes floors.
+
+## Smart-picker and section detail panel
+
+The `SmartPicker` in `client/src/components/sections/smart-picker.tsx` supports `inline`, `applyLabel`, and `noEnvelopePartition` props. It is used in both the section wizard and Workload Studio surfaces.
+
+The `SectionDetailPanel` in `client/src/components/sections/section-detail-panel.tsx` is the right-rail panel on `/curriculum/sections`. It renders kicker, headline, status, term, a three-tile key-fact strip, tab strip (Overview, Meetings, Faculty, Notes), and a recent-activity footer. Prereqs and history live on the full `/sections/:id` page, not the rail.
+
+The panel's CTA cluster is role-aware via `isSchedulerRole` from `client/src/lib/role-gates.ts`. Schedulers (`institutional_admin`, `department_head`, `compliance_officer`) see **Edit** (to `/sections/:id/edit`) and **Propose change**. Everyone else sees an **Enroll** button that fires a placeholder toast; there is no enrollment backend yet.
+
+## Reserved-seat audience catalog
+
+Reserved-seat audiences are per-tenant canonical rows in `section_reserved_seat_audiences`, not free text. This ensures consistency across sections and terms.
+
+## Linked sections
+
+Linked sections use a naming convention helper in `shared/linked-sections.ts`. Suffix mapping is: lab → `L`, discussion → `D`, recitation → `R`, lecture → `""`.
+
+## Rules and gotchas
+
+- **Never derive `catalog_year_id` from dates** when resolving a course row. Always use the persisted value on the term.
+- **Approval-time renumber failures are non-fatal**. The approval succeeds; the warning surfaces later via the renumber-warnings endpoint.
+- **Only NULL and auto-styled (`001...999`) section numbers shuffle during renumber**. Custom values survive every pass.
+- **`PATCH /api/sections/:id` does not re-derive `term_id`**. Editing a published section's dates into another term's window leaves `term_id` where it was.
+- **`SEC_DATES_OUTSIDE_TERM` reads `part_of_term_*` only**, not `start_date`/`end_date`. A section whose run dates leave its term is not flagged by this check.
+
+## Related pages
+
+- [Curriculum](/engineering/areas/curriculum)
+- [Instructional standards](/engineering/areas/instructional-standards)
+- [Teaching and faculty](/engineering/areas/teaching-and-faculty)

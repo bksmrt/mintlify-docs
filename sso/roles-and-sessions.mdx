@@ -1,0 +1,130 @@
+---
+title: "SSO roles and sessions"
+description: "How Proof assigns roles to SSO users, manages session lifetime, and handles deprovisioning."
+sidebarTitle: "Roles and sessions"
+---
+
+When a user signs in through SSO, Proof evaluates role mapping rules, provisions the account if needed, issues a session, and keeps everything in sync with your identity provider through WorkOS Directory Sync. This page covers role assignment, session behavior, and deprovisioning for IT administrators.
+
+For connection setup and IdP configuration, see [SSO overview](/sso/overview) and [Configure SSO](/sso/configure).
+
+## Role assignment at sign-in
+
+Proof does not read a raw role claim from your IdP. Instead, it evaluates role mapping rules you configure on the SSO connection. Each rule matches a domain, group, or custom claim and assigns one of the predefined Proof roles.
+
+### Assignable roles
+
+| Role | Typical access |
+| --- | --- |
+| `institutional_admin` | Full institution authority, including integrations and user management |
+| `compliance_officer` | Compliance workflow oversight and review |
+| `department_head` | Department-level curriculum and faculty management |
+| `faculty` | Teaching, advising, and evidence contribution |
+| `auditor` | Read-only access for external review |
+
+### How rules are evaluated
+
+Rules are evaluated in ascending priority order, and the first active match wins. If no rule matches, the user receives the connection's **default role**.
+
+Match types:
+
+- **Domain**: matches the email domain (for example, `acme.edu`).
+- **Group**: matches a group name from the IdP's `groups`, `memberOf`, or `roles` claims.
+- **Claim**: matches a custom claim key and value you specify.
+
+All matching is case-insensitive. If a user belongs to several groups that match different rules, the rule with the lower priority number takes precedence.
+
+### Security guarantees
+
+- SSO can only assign the roles listed above. Platform-level roles are never assignable through SSO; an invalid rule falls back to `faculty`.
+- Proof never silently rebinds a user to a different SSO connection. If an email already belongs to another connection, sign-in is refused.
+- An account can belong to only one college. If a user already belongs to a different institution, the new connection will not provision them.
+
+## Just-in-time provisioning
+
+If a user signs in through SSO and no matching account exists, Proof creates one automatically.
+
+- **Institution connections**: the user is added to the institution's membership list with the role evaluated from your rules.
+- **Firm connections**: the user is added as an active consultant.
+
+If the user already exists (for example, they were invited by email), their account becomes SSO-bound and their role is updated according to the current connection rules.
+
+## Session lifetime and behavior
+
+Sessions are stored server-side. SSO sessions carry their connection so they can be revoked in bulk when needed.
+
+### Default timeout
+
+The default session lifetime is **1 hour**. After 1 hour of inactivity, the user must sign in again.
+
+### User-configurable timeout
+
+Users can choose a preferred session timeout in their account settings: 30 minutes, 1 hour, 2 hours, or 8 hours. The session is refreshed on every authenticated request, so the timer resets with activity.
+
+### Cookie security
+
+- `httpOnly`: JavaScript cannot read the session cookie.
+- `Secure`: cookies are sent only over HTTPS in production.
+- `SameSite=Lax`: protects against CSRF while still allowing the IdP callback flow.
+
+## Session revocation
+
+Sessions are revoked immediately when:
+
+- An admin **disables or deletes** an SSO connection. All sessions tied to that connection end, and users must sign in again.
+- An admin clicks **Force logout all** on the SSO panel. Every active SSO session for the tenant is revoked.
+- An admin **changes a user's role** or marks them inactive.
+- Directory Sync reports a user as inactive (see [Deprovisioning](#deprovisioning)).
+
+## Deprovisioning
+
+Proof supports deprovisioning through WorkOS Directory Sync. When your IdP deactivates or deletes a user, WorkOS sends a signed event to Proof.
+
+### User deactivated
+
+Proof deactivates the user:
+
+- For **institution** connections, the user's membership is removed.
+- For **firm** connections, the user's firm membership is marked inactive.
+- The user account is marked inactive.
+- All active sessions for that user are revoked.
+
+### User deleted
+
+Proof performs the same deactivation steps. The account record is kept for audit history, but the user can no longer sign in.
+
+### Reactivation
+
+If the IdP later reactivates the user, Proof marks the account active again, restores firm membership if applicable, and allows normal sign-in.
+
+## Role changes after provisioning
+
+Changes to role mapping rules take effect on the user's next sign-in. Existing sessions are not updated retroactively. To apply a role change right away:
+
+1. Update the role rules.
+2. Ask the user to sign out and back in, or use **Force logout all** so users re-authenticate on their next visit.
+
+## Require SSO
+
+When you enable **Require SSO for users on matched domains**, users whose email domains match the connection's verified domains must sign in through SSO. The standard sign-in fallback is blocked for them.
+
+This setting applies per connection and takes effect immediately. Users already signed in through the standard flow keep their session until it expires or is revoked.
+
+## Best practices
+
+- Pick a safe default role (for example, `faculty`) and use specific rules to elevate users to `institutional_admin` or `compliance_officer`.
+- Give your IT admin group's rule the lowest priority number so it matches first.
+- Enable **Require SSO** only after you have tested the connection end to end.
+- Watch the SSO audit log for refused sign-ins, which can point to email conflicts or misconfigured rules.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="SSO overview" icon="key" href="/sso/overview">
+    How SSO works in Proof, including domain verification and JIT provisioning.
+  </Card>
+
+  <Card title="Configure SSO" icon="gear" href="/sso/configure">
+    Create, test, and activate an SSO connection.
+  </Card>
+</CardGroup>

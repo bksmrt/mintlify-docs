@@ -1,0 +1,52 @@
+---
+title: "Respond to a regulatory change"
+description: "Acknowledge a detected regulatory change, review its impact on your compliance rules and policies, and resolve it with a documented reason."
+sidebarTitle: "Respond to regulatory change"
+---
+
+When Proof detects a new regulatory change, your institution must acknowledge it, review what it affects, and record how you addressed it. This guide walks you through the full response from first sighting to final resolution.
+
+## Before you start
+
+- You need a role that can manage regulatory changes. Institutional admins, compliance officers, and admins can perform these actions.
+- The change must appear in the **Detected Updates** tab of the **Regulatory Intelligence** page. If it is not visible, check that your monitored sources are active.
+
+<Steps>
+  <Step title="Open the Regulatory Intelligence page">
+    Click **Regulatory Intelligence** in the sidebar. The page opens on the **Needs Attention** tab, which surfaces urgent items. Switch to the **Regulatory Changes** tab to see the full register, or to the **Detected Updates** tab to review newly scraped entries.
+  </Step>
+  <Step title="Acknowledge the change">
+    Find the change you want to work. Click **Acknowledge** to record that your team has seen it. Acknowledging does not resolve the change. It simply marks the record as read and under consideration. The button becomes disabled after you confirm.
+  </Step>
+  <Step title="Review the impact analysis">
+    Click the change title to open its detail page. Click the **Impact** tab to see what the detection engine matched against your compliance rules and policies. The list shows each matched item with a confidence score. Use the filter tabs (**All**, **Rules**, **Policies**, **High confidence**, **Medium confidence**, **Low confidence**) to narrow the results. Click any match row to expand the reasoning and evidence.
+  </Step>
+  <Step title="Create a project if the change is major">
+    If the entry's classification badge on the **Detected Updates** tab shows **Major**, click **Create Project** on that entry (or **Override ↑** for a minor one) to escalate the change into a formal compliance project. Proof suggests an owner and shows an impact summary before you confirm. After creation, you are taken to the new project to assign the team and begin work.
+  </Step>
+  <Step title="Resolve the change">
+    When you are ready to close the loop, click **Resolve Change**. Choose a resolution type:
+
+    - **Policy Updated**: your affected policies and procedures have been updated.
+    - **No Action Needed**: after review, no updates are required.
+    - **Exception Requested**: an exception is pending approval.
+
+    Enter notes that describe what you did. These notes become part of the audit trail. Click **Submit Resolution** to finalize.
+  </Step>
+</Steps>
+
+## What happens next
+
+- The change status moves to **Resolved** and a timestamp is recorded.
+- The resolution type, notes, and user are added to the **History** tab of the change record.
+- If you created a project, the project remains open until you complete it. You can track progress from the **Projects** list.
+
+<Tip>
+  You can return to any resolved change later to read its audit trail. Open the **Regulatory Changes** tab, set the **Status** filter to **Resolved**, and click the change title.
+</Tip>
+
+## Related
+
+- [Regulatory Intelligence](/user-guide/compliance/regulatory-intelligence)
+- [Start a project](/user-guide/accreditation/how-to/start-a-project)
+- [Update a policy](/user-guide/compliance/how-to/update-a-policy)

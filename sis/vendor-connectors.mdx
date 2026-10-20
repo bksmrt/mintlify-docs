@@ -1,0 +1,166 @@
+---
+title: "Vendor connectors"
+description: "Connect Proof directly to Ellucian Banner, Colleague, Workday, and other vendor APIs."
+sidebarTitle: "Vendor connectors"
+---
+
+Proof offers direct API connectors for major SIS vendors. Each connector reads curriculum and faculty data through the vendor's REST API and, where supported, can write approved catalog changes back to the SIS.
+
+Vendors marked **beta** are implemented against documented APIs but have not yet been validated end to end against a live sandbox. They are available in the connection wizard, and you can configure them, but you should treat early results as exploratory until a sandbox run is completed.
+
+Vendors marked **coming soon** are registered as placeholders and cannot yet run syncs.
+
+<Tabs>
+  <Tab title="Ellucian Banner">
+    Banner connects through the Ellucian Ethos REST API. Proof reads courses, departments, academic programs, terms, and faculty, and it can write approved changes back with PATCH requests.
+
+    **Status**: Beta
+
+    **Authentication modes**:
+
+    - API token (long-lived API key)
+    - OAuth2 bearer token
+
+    **What you need**:
+
+    - Ethos base URL (for example, `https://integrate.elluciancloud.com`)
+    - A valid API token or OAuth2 access token
+    - The `curriculum`, `institutional profile`, `evidence`, and/or `faculty` module enabled
+
+    **Read behavior**:
+
+    - Pages by offset and limit (default page size 100)
+    - Uses the `application/vnd.hedtech.integration.v8+json` media type
+
+    **Writeback behavior**:
+
+    - Sends PATCH requests to the per-resource endpoint
+    - Forwards a per-row idempotency key as `X-Idempotency-Key`
+    - Uses `If-Match` for optimistic concurrency when the vendor supplies an ETag
+
+    <Warning>
+      Banner's beta status means the read and write paths are implemented against documented Ethos shapes, but they have not been proven against a live sandbox yet. Validate connectivity with a small test sync before relying on it in production.
+    </Warning>
+  </Tab>
+  <Tab title="Ellucian Colleague">
+    Colleague connects through the Colleague Web API. Proof reads courses, departments, programs, terms, and faculty, and it can write approved changes back with PUT requests.
+
+    **Status**: Beta
+
+    **Authentication mode**:
+
+    - API token (accepted as a Bearer token)
+
+    **What you need**:
+
+    - Colleague Web API base URL (for example, `https://colleague.example.edu/ColleagueApi`)
+    - A long-lived API token issued by your Colleague admin console
+
+    **Read behavior**:
+
+    - Pages by 1-based page index and page size (default 100)
+
+    **Writeback behavior**:
+
+    - Sends PUT requests to `/{resource}/{externalKey}`
+    - Forwards a per-row correlation ID as `X-Correlation-Id`
+    - Uses `If-Match` with the response ETag for optimistic concurrency
+
+    <Warning>
+      Colleague's beta status means the adapter is implemented against documented Web API shapes but has not been validated end to end against a live instance. Test with a limited data set first.
+    </Warning>
+  </Tab>
+  <Tab title="Workday Student">
+    Workday connects through the Workday Student REST domain. Proof reads course definitions, academic departments, programs of study, academic periods, and instructors, and it can write approved changes back with PATCH requests.
+
+    **Status**: Beta
+
+    **Authentication mode**:
+
+    - OAuth2 access token
+
+    **What you need**:
+
+    - Workday host base URL (for example, `https://wd5-impl-services1.workday.com`)
+    - Workday tenant slug (for example, `examplecollege`)
+    - An OAuth2 access token issued by the integration system user's grant
+    - Optional: override the Student REST domain version (defaults to `v1`)
+
+    **Read behavior**:
+
+    - Pages by offset and limit (default page size 100)
+    - Wraps rows in a `data` array
+
+    **Writeback behavior**:
+
+    - Sends PATCH requests against per-WID endpoints
+    - Forwards a custom `X-Workday-Idempotency-Key` header
+    - Uses `If-Match` with the resource's `versionTag` for optimistic concurrency
+
+    <Warning>
+      Workday's beta status means the adapter is implemented against documented REST shapes but has not been validated end to end against a live Workday tenant. Verify with a small sync first.
+    </Warning>
+  </Tab>
+  <Tab title="Oracle PeopleSoft Campus Solutions">
+    PeopleSoft support is planned for a future release. The connector is registered as a stub and cannot yet run syncs or writeback.
+
+    **Status**: Coming soon
+
+    **Authentication mode** (planned):
+
+    - API token
+
+    **Modules** (planned):
+
+    - Curriculum, institutional profile, faculty
+  </Tab>
+  <Tab title="Jenzabar One">
+    Jenzabar support is planned for a future release. The connector is registered as a stub and cannot yet run syncs or writeback.
+
+    **Status**: Coming soon
+
+    **Authentication mode** (planned):
+
+    - API token
+
+    **Modules** (planned):
+
+    - Curriculum, institutional profile, faculty
+  </Tab>
+</Tabs>
+
+## General connector behavior
+
+All vendor connectors share the same core engine behavior:
+
+- **Advisory locks**: only one sync run per (connection, module) can run at a time.
+- **Paged fetches**: large data sets are streamed in pages, not loaded all at once.
+- **Field mapping**: every connector exposes mappable fields in the connection wizard. You can override default mappings and set transforms.
+- **Run reports**: every sync is recorded with counts for created, updated, skipped, archived, and errored records.
+
+## Connecting a beta vendor
+
+<Steps>
+  <Step title="Choose the vendor">
+    Go to **Settings > Integrations** and select the vendor from the list.
+  </Step>
+  <Step title="Enter environment and credentials">
+    Provide the base URL, tenant (if required), and token or OAuth credentials.
+  </Step>
+  <Step title="Test the connection">
+    Run a test sync. The probe performs a lightweight authenticated request to confirm credentials before the first run.
+  </Step>
+  <Step title="Review and map">
+    Open the field-mapping editor and review the vendor's default mappings against sample rows.
+  </Step>
+  <Step title="Run a dry sync">
+    Execute a dry run to preview what would change without writing anything to your catalog.
+  </Step>
+  <Step title="Enable scheduling">
+    Set a schedule or run manual syncs until you are confident the results are correct.
+  </Step>
+</Steps>
+
+<Note>
+  Beta vendors may return rate-limit responses (HTTP 429) or transient server errors. The engine backs off automatically and retries, but you should monitor early run reports closely.
+</Note>

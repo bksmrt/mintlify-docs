@@ -1,0 +1,214 @@
+---
+title: "Verify webhook signatures"
+description: "Cryptographically verify Proof webhook deliveries using HMAC-SHA256, with copy-paste examples in Node.js, Python, and Go."
+sidebarTitle: "Verify signatures"
+---
+
+Every webhook delivery from Proof includes an `X-Booksmart-Signature` header. You should verify this signature before acting on the payload. Doing so guarantees that the request came from Proof and was not tampered with in transit.
+
+## Signature format
+
+The header value follows the Stripe-style format:
+
+```text
+X-Booksmart-Signature: t=<unix_timestamp>,v1=<hex_hmac>
+```
+
+- `t`: Unix timestamp (seconds since epoch) when the signature was generated
+- `v1`: HMAC-SHA256 of the string `"<t>.<raw_body>"` using your endpoint's signing secret
+
+## Algorithm
+
+1. Read the raw request body as bytes or a UTF-8 string (before any JSON parsing).
+2. Split the header on commas, then on equals signs, to extract `t` and `v1`.
+3. Reconstruct the signed string: `${t}.${rawBody}`.
+4. Compute HMAC-SHA256(secret, signedString) and hex-encode it.
+5. Constant-time compare the expected hex string against `v1`.
+6. Reject the request if the comparison fails or if the timestamp is more than 300 seconds (5 minutes) older or newer than your server's current time.
+
+<Warning>
+  Do not parse the body into JSON before verifying. JSON parsing can change whitespace, alter number precision, or re-encode Unicode, all of which will break signature verification. Use a raw-body middleware.
+</Warning>
+
+## Replay protection
+
+The 300-second tolerance window prevents attackers from replaying old deliveries. For additional protection, track the `eventId` or `X-Booksmart-Delivery` header in a short-lived deduplication store (for example, a Redis set with a 10-minute TTL) and silently drop duplicates.
+
+## Verifier examples
+
+<Tabs>
+  <Tab title="Node.js / Express">
+    ```javascript
+    const crypto = require("crypto");
+    const express = require("express");
+    
+    const SECRET = process.env.WEBHOOK_SECRET;
+    
+    function verifyWebhookSignature(secret, payload, header) {
+      const parts = Object.fromEntries(
+        header.split(",").map((kv) => kv.split("="))
+      );
+      const t = Number(parts.t);
+      const v1 = parts.v1;
+      if (!Number.isFinite(t) || !v1) return false;
+    
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (Math.abs(nowSec - t) > 300) return false;
+    
+      const expected = crypto
+        .createHmac("sha256", secret)
+        .update(`${t}.${payload}`)
+        .digest("hex");
+    
+      const a = Buffer.from(expected, "hex");
+      const b = Buffer.from(v1, "hex");
+      if (a.length !== b.length) return false;
+      return crypto.timingSafeEqual(a, b);
+    }
+    
+    const app = express();
+    
+    // Raw body must come first.
+    app.post(
+      "/hooks/proof",
+      express.raw({ type: "application/json" }),
+      (req, res) => {
+        const sig = req.headers["x-booksmart-signature"];
+        if (!verifyWebhookSignature(SECRET, req.body, sig)) {
+          return res.status(401).send("Unauthorized");
+        }
+        const event = JSON.parse(req.body);
+        console.log("Verified", event.eventType);
+        res.status(200).send("OK");
+      }
+    );
+    ```
+  </Tab>
+  <Tab title="Python / Flask">
+    ```python
+    import hmac
+    import hashlib
+    import time
+    from flask import Flask, request, abort
+    
+    app = Flask(__name__)
+    SECRET = "whsec_your_secret_here"
+    
+    def verify_signature(secret: str, payload: bytes, header: str) -> bool:
+        parts = dict(kv.split("=") for kv in header.split(","))
+        t = parts.get("t")
+        v1 = parts.get("v1")
+        if not t or not v1:
+            return False
+        try:
+            t = int(t)
+        except ValueError:
+            return False
+        if abs(int(time.time()) - t) > 300:
+            return False
+    
+        signed = f"{t}.{payload.decode('utf-8')}"
+        expected = hmac.new(
+            secret.encode("utf-8"),
+            signed.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+    
+        return hmac.compare_digest(expected, v1)
+    
+    @app.route("/hooks/proof", methods=["POST"])
+    def webhook():
+        payload = request.get_data()
+        sig = request.headers.get("X-Booksmart-Signature")
+        if not sig or not verify_signature(SECRET, payload, sig):
+            abort(401)
+        event = request.get_json()
+        print("Verified", event["eventType"])
+        return "", 200
+    ```
+  </Tab>
+  <Tab title="Go">
+    ```go
+    package main
+    
+    import (
+      "crypto/hmac"
+      "crypto/sha256"
+      "encoding/hex"
+      "fmt"
+      "io"
+      "math"
+      "net/http"
+      "strconv"
+      "strings"
+      "time"
+    )
+    
+    const secret = "whsec_your_secret_here"
+    
+    func verifySignature(payload []byte, header string) bool {
+      parts := make(map[string]string)
+      for _, kv := range strings.Split(header, ",") {
+        pair := strings.SplitN(kv, "=", 2)
+        if len(pair) == 2 {
+          parts[pair[0]] = pair[1]
+        }
+      }
+      tStr, v1 := parts["t"], parts["v1"]
+      if tStr == "" || v1 == "" {
+        return false
+      }
+      t, err := strconv.ParseInt(tStr, 10, 64)
+      if err != nil {
+        return false
+      }
+      if math.Abs(float64(time.Now().Unix()-t)) > 300 {
+        return false
+      }
+    
+      signed := fmt.Sprintf("%d.%s", t, string(payload))
+      mac := hmac.New(sha256.New, []byte(secret))
+      mac.Write([]byte(signed))
+      expected := hex.EncodeToString(mac.Sum(nil))
+      return hmac.Equal([]byte(expected), []byte(v1))
+    }
+    
+    func webhookHandler(w http.ResponseWriter, r *http.Request) {
+      payload, _ := io.ReadAll(r.Body)
+      sig := r.Header.Get("X-Booksmart-Signature")
+      if !verifySignature(payload, sig) {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+      }
+      fmt.Println("Verified delivery")
+      w.WriteHeader(http.StatusOK)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Important notes
+
+- **Constant-time comparison**: Always use a constant-time comparison function (for example, `crypto.timingSafeEqual`, `hmac.compare_digest`, or `hmac.Equal`). A naive string comparison leaks timing information that can be exploited to forge signatures.
+- **Time tolerance**: The 300-second window accounts for clock skew between Proof and your server. Do not increase it.
+- **Secret storage**: Store the `whsec_...` secret in a secrets manager or environment variable. Never commit it to version control.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| Signature never verifies | Body was parsed as JSON before verification | Switch to a raw-body middleware |
+| Verification fails intermittently | Clock skew greater than 5 minutes | Sync your server clock with NTP |
+| `v1` is truncated or missing | Header was split incorrectly | Split on commas first, then on `=` |
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Event types and payloads" icon="list" href="/webhooks/events">
+    Browse every event type and its JSON payload shape.
+  </Card>
+
+  <Card title="Delivery behavior" icon="truck" href="/webhooks/delivery">
+    Learn how retries, timeouts, and idempotency work.
+  </Card>
+</CardGroup>

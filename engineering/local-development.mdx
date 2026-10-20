@@ -1,0 +1,98 @@
+---
+title: "Local development"
+description: "How to get the Proof codebase running locally, seed demo data, and avoid common dev gotchas."
+sidebarTitle: "Local development"
+---
+
+You need Node.js 22 or later, a running PostgreSQL 16 instance with the `pgvector` extension enabled, and `npm`.
+
+## Prerequisites
+
+1. **Node.js**: Version 22.12 or higher is required (a dependency, `pg-boss@12`, refuses to install on Node 20).
+2. **PostgreSQL 16**: Install Postgres locally or use a managed instance. Enable the `pgvector` extension on the database you will use for development.
+3. **Environment variables**: Create a `.env` file at the repo root. The server reads many variables at runtime; the table below lists the most important ones.
+
+## Install
+
+```bash
+npm install
+```
+
+If `npm ci` crashes mid-install with "Exit handler never called!", clear the cache and retry with `npm install --no-audit --no-fund`.
+
+## Environment variables
+
+The server reads the names below from `process.env`. Only names are listed here; never commit real values.
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Postgres connection string (required) |
+| `NODE_ENV` | `development`, `production`, or `test` |
+| `PORT` | Server port (defaults to 5000) |
+| `SESSION_SECRET` | Session cookie secret |
+| `ENABLE_DEV_LOGIN` | Set to `1` to enable the dev login picker |
+| `WORKOS_API_KEY` | WorkOS API key |
+| `WORKOS_CLIENT_ID` | WorkOS client ID |
+| `OPENAI_API_KEY` | OpenAI API key (fallback for AI routing) |
+| `AI_INTEGRATIONS_OPENAI_API_KEY` | Preferred OpenAI key for AI integrations |
+| `AI_INTEGRATIONS_ANTHROPIC_API_KEY` | Anthropic API key |
+| `AI_INTEGRATIONS_GEMINI_API_KEY` | Google Gemini API key |
+| `STRIPE_SECRET_KEY` | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret |
+| `SENDGRID_API_KEY` | SendGrid API key (optional; falls back to SMTP or Replit connectors) |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` | SMTP fallback for email |
+| `REPL_ID` / `REPL_IDENTITY` | Replit identity headers (when running on Replit) |
+| `PUBLIC_BASE_URL` | Canonical base URL for links and redirects |
+| `SSO_DATA_KEY` | Encryption key for SSO state cookies |
+
+There are dozens more for AI model routing, queue workers, billing, catalog backfill, and SIS sync. Search `process.env` under `server/` to discover them.
+
+## Start the dev server
+
+```bash
+npm run dev
+```
+
+This runs `tsx watch` over `server/index.ts` with `NODE_ENV=development`. The client is served by Vite's dev server, proxied through Express in development.
+
+## Dev login
+
+When `NODE_ENV !== "production"` and `ENABLE_DEV_LOGIN=1`, a dev login picker is available. It offers seven seeded identities on the demo institution's domain (`@proofeducation.com`):
+
+| Persona | Role | Notes |
+| --- | --- | --- |
+| Miriam Reyes | `institutional_admin` | Full admin access |
+| Grace Hopper | `department_head` | Chair of Computer Science |
+| Ada Lovelace | `faculty` | Claimed to Dr. Ada Lovelace's faculty row |
+| Jordan Nakamura | `student` | Student view |
+| Zora Hurston | `department_head` | Chair of English |
+| Mary Follett | `department_head` | Chair of Business Administration |
+| Daniel Cheng | `compliance_officer` | Reviewer of record |
+
+The dev login endpoints return 404 when disabled. The demo tenant carries no visible `[SEED]` tags; rows are marked with `is_seed = true` internally, and the purge grounds itself on the seeded domain.
+
+## Seeding the demo institution
+
+```bash
+npx tsx scripts/seed-demo-institution.ts
+```
+
+This seeds the `default-institution` tenant with programs, courses, sections, terms, catalog years, and the personas above. It is safe to re-run: `--force` removes only rows the seed wrote (sixteen tables gained `is_seed` for this purpose). Do not seed the operator curriculum sandbox (`13d89868-…`); that tenant is for operator curriculum authoring.
+
+## Database schema
+
+Apply the schema to your local database with:
+
+```bash
+npm run db:push
+```
+
+This runs `drizzle-kit push` and syncs `shared/schema.ts` to Postgres. If Drizzle offers to drop and recreate a table (for example, `agency_standards_catalog`), say no and read `docs/schema-migrations.md` for recovery. The project is db-push-driven; the drizzle journal under `migrations/meta/` is historical and no longer maintained.
+
+## Common gotchas
+
+- **Stale compiled schema twin**: A compiled `shared/schema.js` sits next to `shared/schema.ts`. Vite's default resolution tries `.js` before `.ts`, so tests can silently validate against a months-old copy. Both `vitest.config.ts` and `vite.config.ts` pin `@shared/schema` to the `.ts` source explicitly.
+- **Term without `catalog_year_id`**: `academic_terms.catalog_year_id` is a stored fact, not derived on read. A term without it silently validates its sections against the wrong year's course row. The demo seed pins this column carefully.
+- **Dev login persona roles**: The seeded deans carry `department_head`, not `dean`, because `department_head` is the only non-admin role Workload Studio admits. Department-scoped teaching reads key off `users.department_id`.
+- **Mockup sandbox previews**: The canvas only renders the `main` branch, so mockups built inside an isolated task branch are not visible there. Build mockups only when working on `main`.
+- **Node 22 requirement**: `pg-boss@12` requires Node `>=22.12`. On Node 20, `npm ci` crashes mid-reify with unlinked dev tooling.

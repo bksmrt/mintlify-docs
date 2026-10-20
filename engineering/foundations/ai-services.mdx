@@ -1,0 +1,142 @@
+---
+title: "AI services"
+description: "How Proof routes AI requests across providers, manages embeddings and retrieval, tracks usage, and limits abuse."
+sidebarTitle: "AI services"
+---
+
+Proof uses multiple LLM providers for extraction, classification, narrative assistance, and chat advisors. Requests are routed through a tiered registry with automatic fallback, and every call is counted for cost and rate-limit tracking. This page explains the provider setup, model management, rate limits, and the RAG retrieval stack.
+
+## Where things live
+
+| File | Purpose |
+| --- | --- |
+| `server/modules/ai-routing/router.ts` | Provider selection, retry logic, timeout handling, and usage recording |
+| `server/modules/ai-routing/model-registry.ts` | Concrete model IDs pinned by provider and tier |
+| `server/modules/ai-routing/usage-recorder.ts` | Per-call usage recording into `ai_usage` |
+| `server/modules/ai-routing/reliability.ts` | Circuit breaker, backoff, error classification |
+| `server/modules/ai-routing/embedding-cache.ts` | Embedding deduplication and caching |
+| `server/modules/ai-routing/prompt-safety.ts` | Untrusted-data fencing for prompts |
+| `server/aiRateLimit.ts` | Per-user rate limiting for interactive AI endpoints |
+| `server/aiUsageRollup.ts` | Nightly rollup of `ai_usage` into `ai_usage_daily` |
+| `server/modules/rag/retriever.ts` | Thin adapter over the hybrid retrieval engine for narrative intelligence |
+| `server/modules/evidence-matching/hybrid-retriever.ts` | BM25 + vector hybrid search with optional LLM reranking |
+| `shared/pgvector.ts` | Vector serialization, parsing, and cosine similarity |
+| `docs/ai-model-management.md` | Provider configuration, rotation, and diagnosis notes |
+
+## Providers
+
+Proof supports three providers. A valid key for at least one must be present at server start.
+
+| Provider | Environment variable(s) |
+| --- | --- |
+| OpenAI | `OPENAI_API_KEY`, or `AI_INTEGRATIONS_OPENAI_API_KEY` (plus optional `AI_INTEGRATIONS_OPENAI_BASE_URL`) |
+| Anthropic | `ANTHROPIC_API_KEY`, or `AI_INTEGRATIONS_ANTHROPIC_API_KEY` |
+| Google (Gemini) | `GEMINI_API_KEY`, or `AI_INTEGRATIONS_GEMINI_API_KEY` |
+
+If both an integration key and a plain key are set, the router falls back from the integration client to the plain key on a 401. Use `GET /api/setup/ai-status` to verify that at least one provider is configured. The endpoint returns booleans only, with no secrets.
+
+## Model management and routing
+
+### Registry tiers
+
+`server/modules/ai-routing/model-registry.ts` defines three capability tiers per provider:
+
+- `frontier`: highest-capability model for deep reasoning and hardest tasks
+- `balanced`: default workhorse for extraction, classification, and JSON tasks
+- `fast`: cheapest, lowest-latency tier for rerankers and high-volume passes
+
+Concrete defaults are pinned in the registry. Rotating a model is a one-line change in `model-registry.ts`, or a no-code change via environment variable.
+
+### Resolution precedence
+
+`modelFor(provider, tier, legacyEnvVar?)` resolves a concrete model ID with this precedence:
+
+1. `legacyEnvVar`: per-task override (for example, `AI_ROUTER_DOC_CHUNK_ANTHROPIC_MODEL`)
+2. `AI_MODEL_<PROVIDER>_<TIER>`: registry-level environment override
+3. Pinned registry default
+
+### Reasoning effort
+
+OpenAI's GPT-5 family defaults to `medium` reasoning effort, which is too slow for large extraction chunks. The router pins `reasoning_effort` to `low` by default. Override with `AI_ROUTER_OPENAI_REASONING_EFFORT` (values: `minimal`, `low`, `medium`, `high`; empty string to omit the field).
+
+### Task types
+
+The router accepts a `taskType` label for every request. Examples include:
+
+- `document_chunk_extraction`
+- `policy_summarization`
+- `narrative_rewrite`
+- `portfolio_query`
+- `student_advisor_assistant`
+- `workload_advisor_assistant`
+- `report_question` and `report_summary`
+
+Task types are used for usage attribution and cost rollup.
+
+## Rate limiting
+
+Interactive AI endpoints (advisor chats, portfolio query) are rate-limited per authenticated user. `server/aiRateLimit.ts` uses `express-rate-limit` with a user-id key generator so one user cannot consume another's budget.
+
+```ts
+export const interactiveAiLimiter = buildInteractiveAiLimiter(
+  Number(process.env.AI_INTERACTIVE_RATE_LIMIT ?? 30),
+);
+```
+
+The default is 30 requests per 60-second window. Unauthenticated requests fall back to an IPv6-safe IP key generator, though the downstream `isAuthenticated` gate rejects them anyway.
+
+## Usage tracking and rollups
+
+### Per-call recording
+
+Every routed call records a row in `ai_usage` with tenant, feature, task type, model, tokens, and estimated cost. The `usage-recorder.ts` module handles this automatically inside the router.
+
+### Nightly rollup
+
+`server/aiUsageRollup.ts` runs a daily job that:
+
+1. Aggregates raw `ai_usage` rows within the retention window into `ai_usage_daily` (one row per day, tenant, feature, task, and model)
+2. Deletes raw rows older than the retention cutoff
+
+The rollup is idempotent: it recomputes the whole window each run. The retention window is configured by `AI_USAGE_RETENTION_DAYS` (default 90). Rollup rows for days that age out of the window are frozen and kept indefinitely.
+
+## RAG and retrieval
+
+### Hybrid retrieval
+
+`server/modules/evidence-matching/hybrid-retriever.ts` combines:
+
+- **BM25** for keyword and citation matching (for example, "Standard 8.2.a")
+- **Vector similarity** for semantic relevance
+- **Optional LLM reranking** for a second-stage relevance score
+
+The default configuration uses `bm25Weight: 0.4` and `vectorWeight: 0.6` with reranking on by default. Disable reranking fleet-wide without a redeploy via `AI_ROUTER_RERANK_ENABLED=false`. A reranker error or timeout falls back to the pure hybrid order.
+
+### Narrative RAG adapter
+
+`server/modules/rag/retriever.ts` is a thin adapter that runs the hybrid engine in vector-only mode (`bm25Weight: 0`, `vectorWeight: 1`, `rerank: false`) with section-type weighting enabled. It surfaces top document-chunk matches for narrative annotation generation. Matches with no semantic signal are filtered out so zero-scored lexical filler is not returned.
+
+### Evidence matching
+
+The same hybrid engine powers evidence matching for compliance gaps. It produces a `confidence` score (0-100), a `confidenceBand` (`complete`, `partial`, `weak`, `missing`), and a rationale explaining why the chunk matched.
+
+## Chunking and indexing
+
+Document imports split files into chunks. Each chunk is embedded and stored in `document_chunks`. The platform supports both a legacy JSONB `embedding` column and the pgvector `embedding_vector` column. The retriever tries pgvector first and falls back to JSONB if pgvector is unavailable.
+
+When backfilling embeddings, run `npm run backfill:embeddings`. The streaming import path processes chunks in adaptive concurrent batches and tolerates partial failures: a chunk that fails is retried once sequentially after the burst, and the job completes unless more than half the sections are still missing.
+
+## Diagnostics
+
+If document processing fails:
+
+1. Check `GET /api/setup/ai-status` to confirm at least one provider is configured.
+2. Look for `401` errors during chunking, which indicate an invalid or expired credential.
+3. Check server logs for `[AI Router] attempt_failure` lines, which print provider, model, path, and error for each failed hop.
+4. Verify the model registry default is current: deprecated snapshots return `model_not_found`.
+
+## Related pages
+
+- [Database and migrations](/engineering/foundations/database-and-migrations)
+- [Integrations internals](/engineering/areas/integrations-internals)
+- [Local development](/engineering/local-development)

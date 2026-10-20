@@ -1,0 +1,182 @@
+---
+title: "Webhook events"
+description: "Reference for every event type Proof can deliver, including the envelope schema and example payloads."
+sidebarTitle: "Events"
+---
+
+Each webhook delivery contains a JSON envelope with standard metadata and an event-specific `data` object. This page documents the envelope schema, the available event types, and example payloads extracted from the Proof codebase.
+
+## Envelope schema
+
+Every POST body follows this shape:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `eventId` | string | UUID that uniquely identifies this event occurrence |
+| `eventType` | string | The event type (for example, `sync.run.finished`) |
+| `institutionId` | string | The tenant institution the event belongs to |
+| `occurredAt` | string | ISO 8601 timestamp when the event was emitted |
+| `data` | object | Event-specific payload (see below) |
+
+## Available event types
+
+| Event type | Fires when |
+| --- | --- |
+| `sync.run.finished` | An SIS sync run completes, regardless of outcome |
+| `sync.run.failed` | An SIS sync run finishes with a failure status |
+| `compliance.gap.resolved` | A compliance gap is resolved because evidence was substantiated |
+| `project.status.changed` | A project status changes (defined in the event registry) |
+| `billing.checkout_completed` | A Stripe checkout session completes for the institution |
+| `billing.read_only_entered` | The institution enters a billing read-only state |
+| `ping` | Manually queued via the **Send test** button |
+| `*` | Wildcard: subscribe to every event type listed above |
+
+<Note>
+  `project.status.changed` is registered in the webhook event types list, but it is not currently emitted anywhere in the runtime codebase. If you subscribe to it, you will not receive deliveries today.
+</Note>
+
+## Event payloads
+
+### `sync.run.finished` and `sync.run.failed`
+
+Fired at the end of every SIS sync run in the integration engine.
+
+```json
+{
+  "eventId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "eventType": "sync.run.finished",
+  "institutionId": "inst_12345678-1234-1234-1234-123456789abc",
+  "occurredAt": "2024-06-15T14:32:01.000Z",
+  "data": {
+    "runId": "run_98765432-1234-1234-1234-123456789def",
+    "connectionId": "conn_11111111-2222-3333-4444-555555555555",
+    "vendorId": "acme_sis",
+    "modules": ["terms", "departments", "courses"],
+    "finalStatus": "finished",
+    "isDryRun": false
+  }
+}
+```
+
+Fields:
+
+| Field | Description |
+| --- | --- |
+| `runId` | The sync run identifier |
+| `connectionId` | The SIS connection that ran |
+| `vendorId` | The vendor identifier (for example, `acme_sis`) |
+| `modules` | Array of module names synced in this run |
+| `finalStatus` | `"finished"` or `"failed"` |
+| `isDryRun` | `true` if this was a preview run |
+
+### `compliance.gap.resolved`
+
+Fired when a compliance gap closes because linked evidence was substantiated.
+
+```json
+{
+  "eventId": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
+  "eventType": "compliance.gap.resolved",
+  "institutionId": "inst_12345678-1234-1234-1234-123456789abc",
+  "occurredAt": "2024-06-15T16:45:22.000Z",
+  "data": {
+    "gapId": "gap_22222222-3333-4444-5555-666666666666",
+    "projectId": "proj_33333333-4444-5555-6666-777777777777",
+    "standardId": "std_44444444-5555-6666-7777-888888888888",
+    "trigger": "evidence_substantiated"
+  }
+}
+```
+
+Fields:
+
+| Field | Description |
+| --- | --- |
+| `gapId` | The resolved gap identifier |
+| `projectId` | The project the gap belongs to (may be `null`) |
+| `standardId` | The standard the gap relates to (may be `null`) |
+| `trigger` | The reason the gap resolved (for example, `"evidence_substantiated"`) |
+
+### `billing.checkout_completed`
+
+Fired when a Stripe checkout session completes for an institution tenant.
+
+```json
+{
+  "eventId": "c3d4e5f6-a7b8-9012-cdef-345678901234",
+  "eventType": "billing.checkout_completed",
+  "institutionId": "inst_12345678-1234-1234-1234-123456789abc",
+  "occurredAt": "2024-06-15T18:10:05.000Z",
+  "data": {
+    "subscriptionId": "sub_55555555-6666-7777-8888-999999999999",
+    "kind": "checkout_completed",
+    "stripeSubscriptionId": "sub_stripe_abc123",
+    "stripeCustomerId": "cus_stripe_def456",
+    "planCode": "standard",
+    "bandCode": "medium",
+    "cadence": "annual"
+  }
+}
+```
+
+Fields:
+
+| Field | Description |
+| --- | --- |
+| `subscriptionId` | The Proof subscription identifier |
+| `kind` | The billing event kind |
+| `stripeSubscriptionId` | The Stripe subscription identifier |
+| `stripeCustomerId` | The Stripe customer identifier |
+| `planCode` | The purchased plan code |
+| `bandCode` | The tenant size band |
+| `cadence` | The billing cadence (for example, `"annual"`, `"monthly"`) |
+
+### `billing.read_only_entered`
+
+Fired when an institution's subscription enters a read-only state due to past-due billing.
+
+```json
+{
+  "eventId": "d4e5f6a7-b8c9-0123-defa-456789012345",
+  "eventType": "billing.read_only_entered",
+  "institutionId": "inst_12345678-1234-1234-1234-123456789abc",
+  "occurredAt": "2024-06-15T19:00:00.000Z",
+  "data": {
+    "subscriptionId": "sub_55555555-6666-7777-8888-999999999999",
+    "kind": "read_only_entered",
+    "graceEndsAt": "2024-06-29T19:00:00.000Z"
+  }
+}
+```
+
+### `ping`
+
+Queued manually through the **Send test** button in the webhooks UI.
+
+```json
+{
+  "eventId": "e5f6a7b8-c9d0-1234-efab-567890123456",
+  "eventType": "ping",
+  "institutionId": "inst_12345678-1234-1234-1234-123456789abc",
+  "occurredAt": "2024-06-15T20:00:00.000Z",
+  "data": {
+    "message": "Test delivery from EduComply."
+  }
+}
+```
+
+## Wildcard subscription
+
+If you subscribe to `*`, your endpoint receives every event type including future additions. This is useful for logging or audit pipelines. If you need to filter after receipt, inspect the `X-Booksmart-Event` header or the `eventType` field in the body.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Verify signatures" icon="shield" href="/webhooks/verify-signatures">
+    Learn how to cryptographically verify every delivery you receive.
+  </Card>
+
+  <Card title="Delivery behavior" icon="truck" href="/webhooks/delivery">
+    Understand retries, timeouts, auto-disable rules, and idempotency.
+  </Card>
+</CardGroup>

@@ -1,0 +1,149 @@
+---
+title: "Reporting"
+description: "How Proof's audit ledger, report catalog, export module, saved reports, and the reports chat work together."
+sidebarTitle: "Reporting"
+---
+
+Proof's reporting layer has three parts: the audit ledger that records what happened, the readers that surface history, and the reports that summarize state and change. This page covers the ledger, the history API, Report Studio, the report catalog, the shared export module, saved reports, and the reports chat.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Audit ledger schema | `shared/schema.ts::audit_logs` |
+| Audit taxonomy | `shared/audit-taxonomy.ts` |
+| Audit service | `server/auditService.ts` |
+| Audit helpers | `server/storage.ts::createAuditHelper` |
+| History report resolver | `server/routes.ts::resolveHistoryRead` |
+| History report builder | `server/historyReport.ts` |
+| History report HTML/PDF | `server/historyReportHtml.ts` |
+| History snapshots | `server/historyReportSnapshots.ts` |
+| Open work builder | `server/openWork.ts` |
+| Obligation standing | `server/obligationStanding.ts` |
+| Change summary | `server/changeSummary.ts` |
+| College-level combiners | `server/collegeReports.ts` |
+| Report workbook export | `server/reportWorkbook.ts` |
+| Report catalog | `shared/report-catalog.ts` |
+| Report manifest | `server/modules/reporting/report-manifest.ts` |
+| Report Studio service | `server/modules/reporting/reporting.service.ts` |
+| Saved reports | `server/savedReports.ts` |
+| Report shares | `server/reportShares.ts` |
+| Reports chat planner | `server/modules/reports-ask/plan.ts` |
+| Reports chat answer | `server/modules/reports-ask/summary.ts` |
+| Reports chat routes | `server/routes.ts::POST /api/reports/ask` |
+| Client ask library | `client/src/lib/ask-reports.ts` |
+
+## Audit ledger
+
+The `audit_logs` table is the central ledger. Rows carry `tenant_type`, `institution_id`, `entity_type`, `entity_id`, `action`, `actor_user_id`, `on_behalf_of_user_id`, `changes`, `state`, `ip_address`, `user_agent`, and `created_at`.
+
+Five different code patterns write to the ledger today:
+
+| Pattern | Typical use |
+| --- | --- |
+| `logAudit` / `createAuditHelper(...).log` | After-the-fact writes; swallows failures |
+| `storage.createAuditLog` | Direct, untyped inserts |
+| `buildAuditLogRow` | Transactional form |
+| Raw `db.insert(auditLogs)` | Ad-hoc inserts |
+
+Dedicated history tables exist beside the main ledger for `remediation_status_history`, `evidence_slot_history`, `narrative_edit_history`, and others. These are invisible to the generic trail route and to each other. A unification effort is underway.
+
+## History readers
+
+The `GET /api/history` route is the canonical reader. It supports scopes: `institution`, `project`, `academic_department`, `person`, `standard`, `record`, `engagement`, `mine`, and `agency`. The `resolveHistoryRead` function in `server/routes.ts` enforces per-scope access rules in one place.
+
+For scoped record access, `HISTORY_RECORD_READERS` maps each record type to its storage reader. A course's History, for example, reads `GET /api/history?scope=record&type=course`. The route verifies the record exists in the caller's institution before returning rows.
+
+Readers differ in tenant scoping. `GET /api/my-activity` filters by `user_id` alone, while the trail route forces both `tenant_type` and `institution_id`. An engagement's activity filters by `entity_id` and type.
+
+## Report Studio
+
+Report Studio lives at `/reports`. It is built on a view-agnostic pipeline: a catalog of views, a renderer per view, and shared snapshot, schedule, and history machinery.
+
+Views are tenant-typed. Institutions see `accreditation_readiness`; firms see `firm_portfolio`. The manifest in `server/modules/reporting/report-manifest.ts` gates each view to its tenant type so an institution cannot snapshot a firm report and vice versa.
+
+The service in `server/modules/reporting/reporting.service.ts` returns `RenderedReport` with content, section count, readiness flag, issue list, and header metadata. Formats are `markdown` and `json`.
+
+### Scheduled reports
+
+`server/modules/reporting/reporting.job.ts` creates snapshots on a schedule. It validates the view and tenant type, calls the renderer, and persists an artifact row. Jobs that reference a disabled view or mismatched tenant are refused at enqueue time.
+
+## Report catalog
+
+`shared/report-catalog.ts` is the single source of truth for every dedicated report. It lists each report's id, page, API route, export route, supported formats, read rule, parameters, and example questions.
+
+| Report id | Page | API | Formats |
+| --- | --- | --- | --- |
+| `history` | `/reports/history` | `/api/history/report` | csv, xlsx, pdf |
+| `open-work` | `/reports/open-work` | `/api/open-work` | csv, xlsx, pdf |
+| `obligations` | `/reports/obligations` | `/api/obligation-standing` | csv, xlsx, pdf |
+| `change-summary` | `/reports/change-summary` | `/api/change-summary` | csv, xlsx, pdf |
+| `kpis` | (pilot) | `/api/kpis` | csv, xlsx, pdf |
+
+No module spells a report's address by hand. The catalog's helpers (`reportHref`, `reportApiUrl`, `reportParamsFrom`, `reportQuery`) are enforced by a CI test in `scripts/__tests__/report-address.test.ts`.
+
+Read rules:
+
+- `college-history-readers`: admins, compliance officers, and faculty on the college's staff
+- `project-readers`: anyone who can read the project
+- `person-or-college-readers`: the person themselves, or the college's staff
+
+## Shared export module
+
+`server/reportWorkbook.ts` is the one Excel export module behind every report. A report hands it sheets, an About sheet with facts, and metadata. The module freezes the header row, applies column widths, renders dates as dates, and fills cells by meaning (the stamp tones from `MEANING_FILL`).
+
+```typescript
+export async function reportWorkbook(
+  sheets: WorkbookSheet[],
+  about: AboutFact[],
+  meta: WorkbookMeta,
+): Promise<Buffer>
+```
+
+Every workbook opens identically: frozen header, bold column labels, and an About sheet with who made it, when, in which time zone, and how to read it. The change summary, Obligations standing, KPI report, History, and Open work all route through here.
+
+## Saved reports and sharing
+
+`server/savedReports.ts` implements saved reports. A saved report is its maker's own: a name over one catalog report and its parameters. Names are unique per maker and kind.
+
+The maker and college admins can rename and archive. Sharing is separate: `server/reportShares.ts` lets a maker share a saved report with specific users or roles. Recipients see it in their own list but cannot edit it.
+
+Snapshots are attached to saved reports by key. The latest snapshot for each key is surfaced in the list.
+
+## Reports chat
+
+`POST /api/reports/ask` answers plain-language questions about reports. It is an interactive AI endpoint gated by `interactiveAiLimiter`.
+
+### How it works
+
+1. **Planner**: `server/modules/reports-ask/plan.ts` reads the question and the catalog, then returns a plan: which report fits, what parameters to use, named projects or people, and the period.
+2. **Rows**: `server/modules/reports-ask/rows.ts` fetches the report data by the catalog's own API, enforcing the report's read rule.
+3. **Summary**: `server/modules/reports-ask/summary.ts` writes a natural-language summary with citations back to the report.
+4. **Answer**: The route returns a JSON answer with a link to the report, the summary, and follow-up questions.
+
+A streaming variant exists at `POST /api/reports/ask/stream`. It sends SSE events for phase, link, summary delta, and final answer.
+
+Recent questions are kept per user per institution. The `GET /api/reports/ask/recent` route returns the latest 10, re-reading each answer's cited rows by today's access rules. A row the asker no longer reads is withheld.
+
+### Planner rules
+
+- Name projects and people in words, never guess an id.
+- Periods are days in the asker's zone.
+- "Since July" starts 1 July with no end.
+- Questions about feelings or opinions have no report: set `report` to `null` and explain in `cannot`.
+- When the asker refers to themselves ("my plate", "what did I change"), set `names.person` to `"me"`.
+
+## Rules and gotchas
+
+- **The audit ledger has five write patterns.** Prefer `createAuditHelper` for new routes; it is the most auditable.
+- **`GET /api/history` is the one canonical reader.** Any new history surface should read through it, not query `audit_logs` directly.
+- **Report addresses live in the catalog only.** If you add a report, add it to `shared/report-catalog.ts` and the address test will enforce it.
+- **The export module is shared.** Do not add a second Excel builder. `reportWorkbook` handles frozen headers, dates, wrapped columns, and meaning fills for every report.
+- **Saved reports are per-maker.** A name collision within one maker and one report kind throws `SavedReportNameTaken`.
+- **The reports chat re-reads cited rows on every recent-questions load.** An answer a user could read last week may be withheld today if their role changed.
+
+## Related pages
+
+- [Integrations internals](/engineering/areas/integrations-internals)
+- [AI services](/engineering/foundations/ai-services)
+- [Database and migrations](/engineering/foundations/database-and-migrations)

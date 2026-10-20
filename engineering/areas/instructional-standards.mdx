@@ -1,0 +1,133 @@
+---
+title: "Instructional standards"
+description: "How Proof resolves instructional-minutes floors, schedule-type rules, delivery-mode modality, and agency standards freshness."
+sidebarTitle: "Instructional standards"
+---
+
+Instructional standards are the per-course and per-section rules that govern how much scheduled instructional time is required. The resolver is intentionally a single read seam so every consumer sees the same floor, and the validator enforces it through `SEC_*` diagnostics.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Instructional standards resolver | `server/modules/instructional-standards/resolver.ts` |
+| Resolver types | `shared/instructional-standards-types.ts` |
+| Section validation engine | `server/sectionValidationService.ts` (consumes resolver, emits `SEC_*`) |
+| Schedule-type rules (types + helpers) | `shared/schedule-type-rules.ts` |
+| Catalog sync service (agency freshness) | `server/catalogSyncService.ts` |
+| Scheduler service (nightly agency sweep) | `server/schedulerService.ts` |
+| Suggest minutes-per-contact-hour | `server/modules/instructional-standards/suggest-minutes-per-hour.ts` |
+| Academic conventions | `shared/academic-conventions.ts` |
+
+## The single resolver seam
+
+`resolveInstructionalStandards(...)` in `server/modules/instructional-standards/resolver.ts` is the only sanctioned read for per-course instructional-minutes floors.
+
+### Precedence
+
+Layer precedence is strict: **agency > institution > course > Carnegie fallback**.
+
+- Agency stacks: when multiple agency rules carry an `instructional_minutes` primitive, the result is `max(floors)` and `source.ruleRefs` lists every contributing rule.
+- Lower layers may tighten upward but cannot undercut a higher layer silently. The higher floor wins and the attempt is recorded in `conflicts[]`, surfaced via `SEC_INSTRUCTIONAL_FLOOR_POLICY_CONFLICT`.
+
+### Term-weeks basis
+
+The term-weeks basis determines how floor scaling works:
+
+1. Agency-pinned (max across stacked rules)
+2. Institution ethos override (`operationalTuning.instructionalStandards.termWeeksBasis`)
+3. Derived from `academic_terms` start/end span
+4. Carnegie default (16)
+
+When a `termId` is supplied but the term row lacks start/end dates, the basis falls through to Carnegie 16 and the validator surfaces `SEC_WEEKS_BASIS_UNKNOWN`.
+
+### Per-component floors
+
+When a course breaks `contactHours` into lecture, lab, clinical, or other sub-totals, each is converted to its own minutes floor (sub-hours x minutes-per-contact-hour x term-weeks). When the course carries only an aggregate, every component slot is `null`.
+
+### Skip semantics
+
+Callers that pass section context get a skip reason:
+
+- `zero_credit`: audit or non-credit sections
+- `async_only`: fully online-async sections with no scheduled meetings
+- `no_course` / `no_contact_hours_on_course` / `no_data`: otherwise
+
+A skipped result has `minInstructionalMinutesForCourse === null`; callers must treat it as "no policy" rather than zero.
+
+### Memoization and history
+
+The resolver is memoized 60 seconds per `(institutionId, courseId, sectionId, termId, asOf)`. Call `invalidateInstructionalStandardsCache()` between tests. Callers that care about historical pinning pass `asOf` (typically `term.startDate ?? section.createdAt`); the agency walker filters rule effective/expiration dates against that timestamp.
+
+## Contact hours model
+
+`courses.contactHours` and the component columns (`lectureHours`, `labHours`, `clinicalHours`, and so on) store **whole-term totals**, not per-week rates. The required floor is therefore `hours x minutesPerContactHour` with **no** term-weeks multiplier. Only the scheduled side scales with the section's real span, which forces a compressed section to meet a higher minutes-per-week rate.
+
+Ratio-derived floors (contact hours per credit per week) use a fixed `creditBasisWeeks` (agency-pinned > institution `termWeeksBasis` > calendar-system canon), never the compressed span. A course whose `contactHours` looks like a per-week value (far below what its credits imply) triggers the advisory `SEC_CONTACT_HOURS_LOOK_PER_WEEK` (and the mirror `CRS_CONTACT_HOURS_LOOK_PER_WEEK` on the course side).
+
+## Contact-hour length
+
+One "contact hour" defaults to Carnegie 50 minutes but may be 60 (common for supervised clinical or lab time at health accreditors). Precedence: agency-component > agency-institution-wide > tenant-component > tenant-institution-wide > 50. `suggestMinutesPerContactHour(institutionId)` proposes 60 for clinical/lab when a health accreditor (CCNE, ACEN, CoARC, and so on) is on the institution's profile; it is suggestion-only and surfaced on `GET /api/instructional-standards/settings` for admin confirmation.
+
+## Scheduled share and delivery-mode modality
+
+### `resolveScheduledRequirement`
+
+`resolveScheduledRequirement()` / `scheduledShareForDeliveryMode()` are the single definition of "how much of the course total should appear as scheduled meetings." Five consumers use it: the section validator, the recommendation engine's `decideMinutesFloorGate`, both meeting-pattern suggestion routes, and the editor's per-pattern policy preview (`POST /api/institution/meeting-policy/preview-blocks`).
+
+A configured `0` hybrid in-person share is honored as "no face-to-face minimum required"; only `null` (unset) falls back to the full total.
+
+### Modality mix
+
+Contact hours must be delivered in the right mode, not merely sufficient in total. `section_meeting_patterns.modality` (`in_person`, `online_sync`, `online_async`) records the split per meeting; `sections.deliveryMode` describes the whole section.
+
+Platform defaults are `in_person` 1.0, `hybrid` at least 0.50 (max 0.99 flags a mislabeled mode), `online_*` 0, `hyflex` unset. Precedence: agency > institution > default, strictest wins, undercuts recorded in `conflicts[]`.
+
+The validator emits publish-blocking `SEC_MODALITY_MIX_BELOW_MIN` (exemptible) and advisory `SEC_MODALITY_MIX_ABOVE_MAX`. Exam meetings are excluded from the mislabeled-mode warning so a proctored on-campus final on an online course is not flagged.
+
+### Agency in-person floor vs proportional share
+
+For hybrid sections, `resolveScheduledRequirement()` returns `max(share x total, agency inPersonMinutesRequired)` because the surfaces that call it have no separate modality check and must advertise the same figure the publish gate ultimately requires. The section validator is different: it scales floors with a purely proportional `scaleForSchedule` and enforces the agency in-person aggregate once, via `SEC_HYBRID_AGGREGATE_BELOW`. The agency minimum is section-wide, so it must never be folded into per-component floor scaling.
+
+## Schedule-type rules
+
+`sections.scheduleType` is an institution-specific delta on the meeting pattern. Rules live on `operationalTuning.scheduling.meetingPolicy.scheduleTypeRules` (`ScheduleTypeRule[]`), authored in Workload Studio's Meeting-policy panel and persisted via `PUT /api/institution/meeting-policy`.
+
+A rule matches on schedule type (case-insensitive) and optional subject scope. It constrains:
+
+- Weekly meeting-day count (`meetingsPerWeekMin`/`Max`)
+- Endorsed day shapes (`dayPatterns`)
+
+Departments may shift the floor within `maxMeetingsPerWeekDelta` via `departmentDeltas`, clamped so it never drops below zero. The validator emits `SEC_SCHEDULE_TYPE_MEETING_COUNT` and `SEC_SCHEDULE_TYPE_DAY_PATTERN` at the rule's `enforcement` severity (`warn` default, `block` holds publish). The section editor reads the same rules to show hints and one-click prefill.
+
+## Agency standards freshness
+
+`agency_standards_catalog` carries `lastVerifiedAt`, `verificationSla`, and `verificationSlaCustomDays`; the status enum includes `stale`.
+
+Catalog scrapes refresh the timestamp on unchanged-but-current sources. The nightly sweep, driven by `server/schedulerService.ts`, flips overdue rows to `stale` and fans out one `regulatory_changes` review row per affected tenant. The validator emits info-level `SEC_INSTRUCTIONAL_FLOOR_AGENCY_STALE`, which never blocks save.
+
+## Instructional window
+
+`resolveInstructionalWindow()` in `shared/academic-conventions.ts` picks the narrowest explicit source:
+
+- Meeting-pattern dates
+- Section `startDate/endDate`
+- `partOfTermStart/partOfTermEnd`
+- Term dates
+
+A source counts only when both bounds exist and `end > start`; otherwise the resolver falls through. `SEC_WEEKS_BASIS_UNKNOWN` reports which source was missing.
+
+## Rules and gotchas
+
+- **Any new consumer of historical course rows must call `server/courseRowResolution.ts`**. Deriving a catalog year from dates silently changes which floor applies. See [Sections](/engineering/areas/sections).
+- **Any new consumer that scores meeting patterns against the floor must go through `resolveScheduledRequirement`**. Previously, suggesters read `minInstructionalMinutesForCourse` raw and were too strict for hybrid sections.
+- **The agency in-person minimum is section-wide**. Never fold it into per-component floor scaling or a single component would have to supply the whole minimum.
+- **Preview blocks hold each block to the larger of the scaled aggregate floor and the largest scaled component floor**. The badge returns `componentFloorBinding` / `componentFloorMinutes` so it can name the binding figure.
+- **A `0` hybrid in-person share is honored** as "no face-to-face minimum required". Only `null` falls back to the full total.
+- **Course scope resolves with no section**, so agency floors are not applied at the course level. Agency floors remain a section-time concern.
+
+## Related pages
+
+- [Sections](/engineering/areas/sections)
+- [Curriculum](/engineering/areas/curriculum)
+- [Ethos](/engineering/areas/ethos)

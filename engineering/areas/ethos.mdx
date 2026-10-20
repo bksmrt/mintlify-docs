@@ -1,0 +1,90 @@
+---
+title: "Ethos"
+description: "Tenant ethos defaults, preset overrides, binding-vs-default policies, and the discovery recipe for auditing tuning coverage."
+sidebarTitle: "Ethos"
+---
+
+Ethos is Proof's posture system that lets an institution declare its governance stance and have that stance drive in-app policy, approval chains, and operational defaults. Every ethos-derived knob flows through one of two delivery mechanisms: the predicate fact bag (for approvals) or typed consumers (for concrete tuned values). The binding-vs-default contract is the central architectural rule.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Ethos defaults (spec registry) | `server/ethos/defaults.ts` |
+| Ethos presets (delta maps) | `server/ethos/presets.ts` |
+| Typed consumers | `server/ethos/consumers.ts` |
+| Resolver (effective tuning) | `server/ethos/resolver.ts` |
+| Effective-ethos loader | `server/modules/ethos/effective-ethos.ts` |
+| Ethos routes (save, read) | `server/ethos/routes.ts` |
+| Shared policy registry | `shared/ethos-policy.ts` |
+| Operational tuning types | `shared/schema.ts` (~line 1618+) |
+| Scope classifier | `server/scopeClassifier.ts` |
+| Approval resolver | `server/approvalResolver.ts` |
+| Record override helper | `server/ethos/recordOverride.ts` |
+
+## Binding vs default
+
+Every ethos-derived policy declares whether it is `binding` or `default`:
+
+- **Binding**: a rail. The institution's ethos posture **is** the policy. Tenant admins cannot override it. Real-world exceptions are handled per-record via `recordEthosOverride`, which captures `policyKey`, previous/new values, a minimum 10-character justification, and the ethos snapshot. Never via a silent admin toggle.
+- **Default**: a starting point. Tenant admins can override via the settings panel. The ethos preset seeds a sensible value; the admin tweaks if needed.
+
+The resolver returns each policy as `{ value, binding, source: "ethos" | "override" }`. Callers that only care about the effective answer read `.value`; callers that need to expose an override UI check `.binding`; audit uses `.source`.
+
+Binding policies are enumerated in `shared/ethos-policy.ts` (`ETHOS_POLICY_REGISTRY`). Most existing knobs remain `default`. The first binding policies are `directive_permitted`, `chair_signoff_required`, and `notifications.directiveAckWindowDays`.
+
+## Where the posture is stored
+
+The chosen posture lives in **two places that must agree**:
+
+1. **Source of truth (versioned):** `institutional_ethos` head → `institutional_ethos_versions.operations_axis_preset` / `student_axis_preset`. This is what `loadEffectiveEthos` reads and what the Institution Profile shows.
+2. **Denormalized read columns:** `institutional_profiles.operations_preset` / `student_preset`. These are what `getEthosTuning`, the GET `/api/institution/ethos` endpoint, and the student/teaching match modules actually read.
+
+**Invariant:** `saveEthos` writes both in one transaction and invalidates the resolver's per-institution tuning cache. If you add a new write path, it must set both stores or the disconnect returns. `scripts/20260827_ethos_backfill_profile_presets.sql` heals rows saved before the invariant existed.
+
+## Ethos consumption map
+
+### Approvals (three paths)
+
+1. **Predicate facts:** ethos is projected into facts namespaced `ethos.operations`, `ethos.student`, and `ethos.nudges.<tuningPointId>` by `ethosFactBag` in `server/modules/ethos/effective-ethos.ts`. These are evaluated against predicate-DSL rules in approval steps. The allowed-field set is whitelisted in `server/approvalResolver.ts`. Anything not whitelisted is rejected.
+2. **Step-parameter fallback:** `OperationalTuningApprovals` (`shared/schema.ts`) is supplied to the resolver as `ctx.ethosApprovals` and spliced into step-parameter chains in `resolveApprovalPlan`. Precedence: explicit per-step override > policy step value > ethos value > hardcoded default.
+3. **Scope inheritance:** `classifyChildScope` in `server/scopeClassifier.ts` calls `getEthosScopeInheritance`; posture decides `in_scope` (child inherits parent's approval) vs `escalate` (child gets its own chain). `enforceBoundary` is a hard rail; exceptions use `recordEthosOverride`.
+
+### Proposals (two paths)
+
+1. **Ethos-conditional field rules:** proposal template fields declare `ethosRules`; `validateProposalDataWithEthos` in `server/modules/curriculum-proposals/validate-proposal-data.ts` resolves the fact bag and fires each rule's `when` predicate.
+2. **Scope classification at proposal time:** the same `classifyChildScope` decides whether a curriculum proposal's change is inheritable or must escalate.
+
+### Typed consumers
+
+`server/ethos/consumers.ts` exports `getEthos*` functions that return concrete tuned values. Key consumers include:
+
+- `getEthosFacultyInviteSnapshot`: caps, TTL, reminder cadence
+- `getEthosDirectivePermitted` / `getEthosDirectivePermittedAsPolicy`: binding policy for directive assignments
+- `getEthosChairSignoffRequired` / `getEthosChairSignoffRequiredAsPolicy`: binding policy for post-acceptance approval
+- `getEthosImpactGate`: curriculum impact gate thresholds
+- `getEthosEvidenceMonitoring`: evidence aging recency window (`defaultShelfLifeDays`, `agingSoonWindowDays`)
+
+## Sweep recipe: discovering orphaned tuning
+
+Use this when auditing that every ethos knob is actually read outside the defaults/presets/schema:
+
+1. **Enumerate the source of truth:** `OperationalTuning*` interfaces in `shared/schema.ts` (~line 1618+), plus `server/ethos/defaults.ts` and `server/ethos/presets.ts`.
+2. **Prove each knob has a consumer:** grep `server` for the knob name. If the only hits are defaults/presets/schema, it is **orphaned**.
+3. **Predicate-fact knobs** must be projected by `ethosFactBag` and whitelisted in `server/approvalResolver.ts`.
+4. **Typed-consumer knobs** must have a caller outside `server/ethos/`. Confirm each declares a binding mode.
+5. **Binding vs default:** every new ethos-derived policy must declare its mode explicitly.
+
+## Rules and gotchas
+
+- **Treat any ethos value with no reader as a latent orphan**, not a feature. The `approvals` step-param block was orphaned until wired into the resolver.
+- **There is no generic side-channel.** Ethos reaches approvals only through the three paths above and proposals only through the two above.
+- **Always write both stores** (versioned + denormalized) in any new save path, or the disconnect returns silently.
+- **Binding policies refuse tenant-admin overrides** with `error_code: ethos_policy_binding_no_override`.
+- **Ethos snapshots on records include binding mode** so audit replay can answer "was this a rail or a default at the moment of decision?"
+
+## Related pages
+
+- [Teaching and faculty](/engineering/areas/teaching-and-faculty)
+- [Curriculum](/engineering/areas/curriculum)
+- [Approvals framework](/engineering/foundations/approvals-framework)

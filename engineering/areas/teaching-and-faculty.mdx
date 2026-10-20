@@ -1,0 +1,140 @@
+---
+title: "Teaching and faculty"
+description: "Workload Studio, faculty invitations, directive assignments, teaching metrics, and the post-acceptance approval chain."
+sidebarTitle: "Teaching and faculty"
+---
+
+The teaching and faculty domain models the full coordination cycle between department heads and instructors: staffing sections, inviting faculty, tracking acceptances, recording qualifications, and surfacing metrics. The Workload Studio cockpit is the primary admin surface, and `/my-teaching` is the faculty-side counterpart.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Workload Studio page | `client/src/pages/workload-studio.tsx` (seven surfaces: sections, faculty, triage, advisor, metrics, history, settings) |
+| Workload Studio advisor chat | `client/src/components/workload-studio/advisor.tsx`, `server/workloadStudioAdvisorRoutes.ts` |
+| Grounded chat prompts | `server/modules/ai-routing/grounded-chat-prompt.ts` |
+| Faculty invitation service | `server/facultyInvitationService.ts` |
+| Faculty directive service | `server/facultyDirectiveService.ts` |
+| Faculty routes (preferences, qualifications, invitations) | `server/facultyRoutes.ts` |
+| Faculty scheduling storage | `server/facultySchedulingStorage.ts` |
+| Faculty post-acceptance chain | `server/facultyPostAcceptanceChain.ts` |
+| Faculty qualification service | `server/facultyQualificationService.ts` |
+| Teaching match routes | `server/teachingMatchRoutes.ts` |
+| Section interest storage | `server/sectionInterestStorage.ts` |
+| Section interest sweep | `server/sectionInterestSweepService.ts` |
+| Teaching metrics recency aggregator | `server/modules/teaching-metrics/recency-aggregator.ts` |
+| Section evaluations routes | `server/sectionEvaluationsRoutes.ts` |
+| My-teaching pages | `client/src/pages/my-teaching/{history,suggestions,preferences}.tsx`, `client/src/pages/my-teaching-v1h.tsx` |
+| Smart preferences editor | `client/src/components/faculty/smart-preferences-editor.tsx` |
+| Faculty qualifications schema | `shared/schema.ts::facultyQualifications` |
+
+## Workload Studio surfaces
+
+Workload Studio at `/workload-studio/:surface` replaces the legacy `/faculty-scheduling` and `/scheduling-desk` pages. Seven surfaces are available:
+
+- `sections`: section roster and staffing state
+- `faculty`: faculty list and workload view
+- `triage`: the primary teaching surface (see Triage below)
+- `advisor`: AI-assisted faculty-to-section matcher
+- `metrics`: teaching metrics dashboard
+- `history`: past invitation outcomes
+- `settings`: policy and preference configuration
+
+Default surface is `triage`. Term state lives in the query string (`?termId=...`) and survives surface navigation. Role-gated to `institutional_admin` and `department_head`.
+
+## Triage
+
+Triage is the primary surface for understanding the state of teaching for a term. It surfaces three row states:
+
+- `needs-attention`: declined invites, flagged directives, cap violations
+- `in-flight`: pending offers (`offer-sent`, `offer-nudged`) and un-flagged directives inside the `notifications.directiveAckWindowDays` window
+- `settled`: accepted invites, directives past the ack window
+
+`GET /api/workload-studio/triage` accepts `?group=state|section|faculty` and returns items plus counts. Under `group=section`, settled rows surface as `kind: unfilled` with `settled: true` so the by-section view shows the full roster. The header renders three chips (`unstaffed`, `awaiting you`, `open outreach`) plus a regroup toggle.
+
+## Faculty invitation lifecycle
+
+Invitations flow through `faculty_class_invitations` with a status machine driven by `server/facultyInvitationService.ts`.
+
+### TTL and notifications
+
+Invitation TTL is ethos-driven (default 48 hours, overrideable 1h to 2160h). Notifications fan out on send, resend, withdraw, accept, decline, and expiry. Audit rows carry `previousState`, `newState.subjectUserId`, `ttlHours`, and `ethosSnapshot`.
+
+### Concurrency caps
+
+Per-section and per-faculty pending-invite caps are ethos-driven (defaults 3 and 3). Enforced as `409` with `error_code: invite_cap_exceeded_section` or `invite_cap_exceeded_faculty`. The snapshot is stamped on `faculty_class_invitations.metadata.ethosSnapshot` so audit replay survives preset rotation.
+
+### Directive vs offer
+
+Invitations carry a `kind` column: `offer` or `directive` (default `offer`).
+
+- **Offer**: the standard accept/decline flow. Faculty can accept or decline with a typed reason.
+- **Directive**: a chair-assigned section with no acceptance required. `server/facultyDirectiveService.ts::issueDirectiveAssignment` inserts the invitation and `section_instructors` row atomically. The invitation lands in terminal `directive_issued` status with no token and a past `expires_at`. The faculty member's only structured turn is `POST /api/faculty/invitations/:id/flag-conflict` with a typed reason (`schedule_conflict`, `modality_mismatch`, `personal_unavailable`, `other`) plus optional free text. Flagging does **not** revert the assignment; the chair must act via existing tools.
+
+Permission for directives is governed by the **binding** ethos policy `directive_permitted` (`allowed`, `requireRecentTaught`, `recentTermsLookback`). When denied, the route returns `409 { error_code: "directive_not_permitted" | "directive_requires_recent_taught", overrideRequired: true }`. Per-record overrides require a minimum 10-character justification via `recordEthosOverride`.
+
+## Post-acceptance approval chain
+
+`server/facultyPostAcceptanceChain.ts::runPostAcceptanceApprovalChain` is the single sanctioned seam fired after both faculty invitation accept paths (magic-link and in-app) commit. It is never inside the accept transaction, so a chain-write failure cannot roll back the acceptance.
+
+When the **binding** ethos policy `chair_signoff_required` is off (default), the seam writes a `faculty_invitation_post_accept_chain_skipped` audit row and returns `not_required`. When on, it inserts a real `approval_requests` row with `subjectKind = 'faculty_invitation'` plus an activated `approval_request_steps` row for chair sign-off, using the same `decideApprovalStep` entrypoint that project approvals use. The new DAF row IDs are stamped onto `faculty_class_invitations.metadata.postAcceptanceChain`.
+
+## Faculty qualifications
+
+`facultyQualifications` in `shared/schema.ts` is a deliberately thin credential-to-teaching compliance record. One row per `(institutionId, facultyMemberId, courseId)` captures:
+
+- `basis`: `direct_degree`, `related_field`, `tested_experience`, `other_equivalency`, `override`
+- `status`: `qualified`, `provisional`, `not_qualified`
+- `justification` and an audit-durable `credentialSnapshot` (JSONB)
+- `determinedBy` / `determinedAt`
+
+Routes at the top of `server/facultyRoutes.ts`:
+
+- `GET /api/faculty/members/:facultyMemberId/qualifications`: stored determinations plus derived suggestions for taught-but-unrecorded courses
+- `PUT /api/faculty/qualifications`: admin-like upsert; justification >=10 chars required when `basis` is `tested_experience`, `other_equivalency`, or `override`
+- `DELETE /api/faculty/qualifications/:id`
+
+This is **not** a transcript repository. It links existing `faculty_members.credentials` to courses and records why that qualifies the instructor. Writes go through `assertTenantWriteHere` so the operator tenant stays read-only.
+
+## Teaching metrics
+
+The recency aggregator in `server/modules/teaching-metrics/recency-aggregator.ts` computes weighted averages with exponential decay (default 18-month half-life). Metrics feed into the advisor matching and faculty workload views.
+
+## Smart preferences
+
+The canonical faculty preferences editor on `/my-teaching/preferences` uses a 3-bucket time-of-day model. Per-term overrides are stored via `server/facultyRoutes.ts`.
+
+## `/my-teaching` IA split
+
+Task #1007 split the faculty surface into four focused pages:
+
+- `/my-teaching`: pending decisions, term-grouped invitation cards
+- `/my-teaching/history`: list and filter past invites
+- `/my-teaching/suggestions`: request-a-section panel
+- `/my-teaching/preferences`: smart-preferences editor plus locked workload history
+
+Shared data hook and nav live in `client/src/pages/my-teaching/shared.ts` and `client/src/components/faculty/my-teaching-nav.tsx`.
+
+## Section interest requests
+
+`section_interest_requests` is the faculty-initiated counterpart to `faculty_class_invitations`. Faculty can raise their hand for sections they want to teach. Storage and sweep logic live in `server/sectionInterestStorage.ts` and `server/sectionInterestSweepService.ts`.
+
+## Dev server watch mode
+
+`npm run dev` runs `tsx watch` scoped to `server/**` and `shared/**`, so server-side code serves traffic as soon as files land. Previous builds that ran `tsx server/index.ts` (no watch) left the live process pinned to stale code, which caused production issues with gating.
+
+## Rules and gotchas
+
+- **The post-acceptance chain is the only sanctioned reader of `chair_signoff_required`**. Route code never branches on this policy directly.
+- **Directive flagging does not revert the assignment**. The chair must withdraw, reassign, or re-issue as an offer.
+- **Faculty qualifications must not flow through `evidence_matches`**. Its `document_id` is NOT NULL. Use the parallel structured-evidence feed via `GET /api/projects/:projectId/faculty-qualification-evidence` instead.
+- **The advisor recommendation contract**: if recommendation language appears in any text bubble, the reply must include an `agent_handoff` bubble and the text must explicitly reference that handoff's `targetKey` verbatim.
+- **Workload Studio advisor transcripts** are scoped per `(user, section)` with a 180-day retention and 200-turn hard cap.
+- **bksmrt operator write is blocked** on all faculty mutation routes via `assertTenantWriteHere`.
+
+## Related pages
+
+- [Sections](/engineering/areas/sections)
+- [Ethos](/engineering/areas/ethos)
+- [Curriculum](/engineering/areas/curriculum)
+- [Approvals framework](/engineering/foundations/approvals-framework)

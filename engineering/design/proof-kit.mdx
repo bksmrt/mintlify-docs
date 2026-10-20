@@ -1,0 +1,177 @@
+---
+title: "Proof Kit"
+description: "The editorial design system for painted illustration, semantic tokens, marks grammar, and the journal page idiom."
+sidebarTitle: "Proof Kit"
+---
+
+Proof Kit is the product's editorial design system. It covers the painted watercolor-and-ink illustration style, the "review grammar" of marks and ornaments, semantic color tokens, and the Journal register page idiom. Real product screens adopt it incrementally, page by page, through the Antique Editorial conversion protocol.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Semantic palette | `client/src/lib/proof/palette.ts` |
+| Marks grammar | `client/src/lib/proof/marks.ts` |
+| Mark component | `client/src/components/proof/Mark.tsx` + `Mark.css` |
+| Standard name component | `client/src/components/proof/StandardName.tsx` + `StandardName.css` |
+| Painted plate | `client/src/components/proof/PaintedPlate.tsx` |
+| Typography classes | `client/src/components/proof/typography.tsx` |
+| Ornaments | `client/src/components/proof/ornaments.tsx` |
+| Review grammar marks | `client/src/components/proof/marks.tsx` |
+| Journal page kit | `client/src/components/proof/journal.tsx` |
+| Antique plate layer | `client/src/components/proof/antique.tsx` |
+| Living style guide | `client/src/pages/proof-kit.tsx` |
+| CSS variables | `client/src/index.css` (`--proof-*`) |
+| Tailwind group | `tailwind.config.ts` (`proof` color group) |
+
+## Art direction
+
+The primary visual is fine hand-drawn navy line art on a paper or canvas ground. Watercolor is a small depth splash anchored behind the line art. It must never be a full-section wash. Large washes read as gradients and break the language. Dark conversion bands (CTA, footer) stay flat warm-dark with a small oak hairline rule as the only accent.
+
+Marginalia is a recurring, sparing device: margin notes, review-note callouts, footnote citations, and the Proof Note Mark (a looped-'p' loop plus jot stroke) as an inline gesture. The Note Mark is never a bullet or logo.
+
+Brand identity is the editorial serif "Proof" wordmark plus the looped-'p'-with-evidence-dot icon family. Palette: navy ink, paper, oak, sage. Voice: warm, premium, archival, editorial, academic, human.
+
+## Living style guide
+
+Visit `/proof-kit` in development to see every primitive demonstrated. It is gated behind `import.meta.env.DEV` in `App.tsx` and is never linked in product navigation.
+
+## Color system
+
+Color carries meaning. The semantic tokens are defined in `client/src/lib/proof/palette.ts` and bound to CSS variables in `client/src/index.css`.
+
+| Token | Role |
+| --- | --- |
+| `ink` | Trust and authority (primary text, outlines) |
+| `sage` | Evidence and growth (add, positive) |
+| `oak` | Review and validation (review state, citations, overlines) |
+| `clay` | Attention and action (focus, due, destructive) |
+| `violet` | Notes and insight (reviewer marginalia) |
+| `mist` | Neutral and calm (reference leaders) |
+| `slate` | Structure and support (hierarchy, scaffolding) |
+| `teal` | Connection and reference |
+
+Surfaces: `paper` (warm illustration ground), `surface` (card), `hair` (hairline rules), plus `ink-soft` (secondary text).
+
+Accent hues are brand-fixed across light and dark. Only `paper`, `surface`, `ink`, and `hair` flip in dark mode. Marks are always paired with text; never rely on color alone.
+
+Painted plates keep a light ground in both themes. `--proof-paper-base` (`#F2EADB`) never flips, so `PaintedPlate` uses `mix-blend-multiply` and keeps reading on dark backgrounds.
+
+## Marks grammar
+
+`client/src/lib/proof/marks.ts` defines the C3 matrix: one table from meaning to look.
+
+| Meaning | State | Line | Tone | Wash | Tick |
+| --- | --- | --- | --- | --- | --- |
+| `open` | open | dashed | clay | yes | no |
+| `unread` | open | dashed | slate | no | no |
+| `awaiting` | open | dashed | oak | no | no |
+| `stopped` | open | dashed | oxblood | no | no |
+| `advisory` | advisory | solid | slate | no | no |
+| `resolved` | settled | box | sage | no | yes |
+| `quiet` | settled | box | slate | no | no |
+| `link` | link | dotted | none | no | no |
+| `note` | note | wavy | violet | no | no |
+| `draft` | open | dashed | clay | no | no (faded) |
+
+Rules:
+
+- Dashed means open (someone still has to act).
+- Solid means advisory (worth a look, blocks nothing).
+- Box means settled (ghost outline, no line).
+- Dotted means a link.
+- Wavy means a writing note.
+- Wash appears only under a clay mark.
+- The checkmark appears only on `resolved`.
+
+`<Mark meaning=...>` in `client/src/components/proof/Mark.tsx` is the one element that draws a line under text. It writes `data-mark`, `data-line`, and `data-tone` last, so callers cannot override the look. `Mark.css` is Proof's table.
+
+## The vl-marks ratchet
+
+Hand-rolled underlines outside the module are counted by `scripts/__tests__/vl-marks.ratchet.test.ts`. The baseline is held file by file: no file may rise, no new file may join, and a fall must lower the baseline in the same change. The goal is to reach zero hand-rolled marks so a second style guide (VL-RM1) can be swapped in as a second table with no surface changes.
+
+## Journal register kit
+
+The Journal register kit is a full page grammar for list and detail screens set like a scholarly periodical. It is documented in detail in `docs/areas/proof-antique-editorial.md` and summarized here.
+
+### Idioms
+
+1. **Journal register** (deep conversion): for registers and detail leaves. The page becomes a flat parchment sheet scoped under `.pf-journal`.
+2. **Mural header** (light touch): for area hubs that keep their body. Swap only the header for `MuralPageHeader`.
+
+### Register shell
+
+```text
+<JournalPage>
+  <Runhead left="..." right="..." />
+  <Nameplate kicker title standfirst ... />
+  <div className="pfj-toolbar">...</div>
+  <SubjectFilter ... />
+  <StatusBar items={...} />
+  <div className="pfj-register">
+    <AccessionEntry ... />
+    <BulkBar ... />
+    <RegisterHead ... />
+    {rows.map(r => <RecordRow ... />)}
+    <RegisterPager ... />
+  </div>
+</JournalPage>
+```
+
+### Detail shell
+
+```text
+<JournalPage pinned={isPinned}>
+  <ReturnLink ... />
+  <h1 className="pfj-doctitle">...</h1>
+  <StandingMark ... />
+  <ClerkNote ... />
+  <div className="pfj-statusbar">...</div>
+  <div className="pfj-article">...</div>
+</JournalPage>
+```
+
+### Replacements
+
+| shadcn / generic | Journal replacement |
+| --- | --- |
+| Card rows, Table | `RegisterHead` + `RecordRow` |
+| Tabs | `StatusBar` / `.pfj-statusbar` |
+| Badge | `StandingMark` |
+| Button | `.pfj-btn` / `ProofButton` |
+| Skeleton | italic retrieving line / `ProofLoadingState` |
+| Empty state | `JournalEmpty` |
+| AlertDialog | `ConfirmDialog` |
+| Alert banners | `ClerkNote` |
+| Create Dialog | `AccessionEntry` |
+| Pagination | `RegisterPager` |
+| Page header | `Runhead` + `Nameplate` / `MuralPageHeader` |
+
+## Flatness, attention, and quotation
+
+Three rules govern expression of state:
+
+1. **Paper is flat; only affordances lift.** Static content gets no fill, no border, no shadow. Anything the user can act on gets exactly one edge treatment.
+2. **Severity is something done to the page, not something the page is.** It lives in the margin via `MarginRule`: one stroke for a heading, two for urgent. Scope the positioned ancestor to the heading alone.
+3. **A quotation is a person's words, and nothing else.** `Quotation` is the committee revision-comment pattern: hanging block, oversized opening quote in the speaker's tone, serif italic body, small-caps attribution. Reserve it for text a named person actually wrote.
+
+## Rollout
+
+Adoption is incremental, page by page. Wave order: rails and docs first, then core register and detail pairs, then hubs and partials, then Evans-to-Proof migration, then large workspaces, then the long tail. See `docs/areas/proof-antique-editorial.md` for the full conversion protocol, safeguards, and gotchas.
+
+## Rules and gotchas
+
+- **Fonts are preloaded in `client/index.html`.** Do not add new font loading. The kit references them via `font-['…']` arbitrary classes.
+- **`--proof-paper-base` never flips.** Keep painted plates on it in both themes.
+- **Filled oak CTAs use the deep ramp** (`#7E5827` rest, `#8A6230` hover, `#6F4D22` press, `#5E411D` edge) with `--proof-paper-base` text for contrast.
+- **Any reusable SVG `id` derives from `useId()`.** Hardcoded ids break filters when a component renders twice.
+- **Badges are no-fill** (accent text + border over a 10% tint). Only CTAs and meters carry solid fills.
+- **Import from the barrel `@/components/proof`,** never deep paths.
+- **`components/ethos/*` stays untouched.** It is a separate system.
+- **Do not mix Evans and Proof tokens within one page.** Migrate the whole page, or keep it on Evans until ready.
+
+## Related pages
+
+- [Visual language](/engineering/design/visual-language)
+- [Curriculum](/engineering/areas/curriculum)
+- [Sections](/engineering/areas/sections)

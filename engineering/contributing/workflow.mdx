@@ -1,0 +1,78 @@
+---
+title: "Contributing workflow"
+description: "How to open a PR, the redesign governance model, and the canonical rules that keep the codebase consistent."
+---
+
+This page covers the conventions you follow when contributing to Proof: branch and PR discipline, how redesign work is governed, how to ask the owner a question, and the app-wide canonical rules (marks, decisions, registers) that every surface must obey.
+
+## Branch and PR conventions
+
+Every pull request opens as a draft and is marked ready once, when the work is actually done. This policy exists to reduce CI minutes: October averaged 7.7 CI runs per merged PR, most of them pushes made while a session iterated.
+
+- **On a draft**, the `unit-tests.yml` workflow runs only the quick checks: dependency install, `npm audit`, agency-catalog drift check, and the TypeScript ratchet. The server and client test suites, the build, and the three database jobs are skipped.
+- **Mark the PR ready** before asking for review or before any "ready to merge" statement. That triggers the full suite exactly once. After that, pushes to the ready PR rerun the full suite.
+- **Convert back to draft** only for a long rework. That cancels any full run still in flight and returns to quick-check mode.
+
+Run the suites you changed locally while iterating. The merge to `main` runs the full suite again on what actually ships.
+
+## Redesign governance
+
+Redesign or reskin work on any surface is governed by that surface's completeness contract. Read the contract before touching the surface. The contracts live in `docs/design/` and follow a standard structure: numbered rows with live contents and proposed dispositions, an idiom census, a defect index, open questions, and a slice sketch.
+
+### The completeness contract is the definition of done
+
+The mocks are a style reference and are partial. The contract's row inventory is complete. A redesign PR must include:
+
+1. **Contract-coverage rows** it completes.
+2. **Mock-vs-shipped screenshot pairs** rendered with the harness (`client/fixtures/` + `scripts/reskin-shot.mjs`).
+3. **Owner visual approval** before merge. Green CI alone is never sufficient.
+
+### Fixture before mock
+
+Mount the real page over the stub with a seeded, realistic world. Lifecycle variants switch by query param (`?state=…`). Serve envelope-shaped endpoints with their real shapes so the fixture does not crash or loop when a route is missing.
+
+### Annotated atlas
+
+The initial map of any surface is delivered as an annotated atlas: renders of the UI itself with callout overlays pinned to each row's element. The atlas artifact includes a per-shot legend and an honesty list of every row not visible on any shot. The map stays complete where the camera cannot reach.
+
+### Asking questions about a surface
+
+When you need the owner to decide between options, draw the options; do not describe them. Each option is rendered as the UI it would produce, side by side, using the tenant's real data. Include the current behavior as an option, say which you would pick and why, and name what each option blocks so the owner sees the cost of deferring.
+
+## The decisions register
+
+One standing register captures every open question and every question on it gets addressed meticulously. The register lives in a canonical artifact with fixed sections:
+
+- **Blocking now**: decisions the owner must make before work proceeds.
+- **In review**: work awaiting the owner's word at a gate.
+- **Answered, to build**: decided and recorded, not yet built.
+- **Deferred by owner**: parked by the owner's word, recorded so it survives.
+- **Decided**: a ledger of question, answer, and where the answer now lives (contract row, file, or issue).
+
+Capture every decision the moment it surfaces. Address one at a time to done: build it (fail-first), record it as a boundary, update the register, and reply to the thread. Republish the register on every state change.
+
+Visual approvals waiting on the owner live on the register too. Every ask carries its pictures in chat, captioned and pinned to the element being asked about. Never answer "sent earlier" or "see the PR body."
+
+## Canonical app-wide rules
+
+These rules apply everywhere in the product. A surface that seems to need a local override needs a spec change instead.
+
+### Lists are canonical
+
+Any surface that lists records follows `docs/design/register-canonical.md`: one frame, one header band, eight fixed row slots, two densities. The per-surface contract says what content the rows carry; the register spec says how they look, and wins on disagreement.
+
+### Marks are canonical
+
+Any line drawn under text, wash, checkmark, link glyph, or arrow follows `docs/design/visual-language.md`. `client/src/lib/proof/marks.ts` is the table from meaning to look, and `components/proof/Mark.tsx` is the one element that draws it. Never hand-roll an underline, dotted border, or dashed line in CSS, inline styles, or Tailwind classes. The ratchet test `scripts/__tests__/vl-marks.ratchet.test.ts` counts hand-rolled marks per file and only allows the count to fall.
+
+### Decisions are canonical
+
+Any place a person approves, sends back, or declines what another person submitted follows `docs/design/approvals-one.md`: one reason rule, one decision card, and one feed that the Approvals page and the Inbox read through the kind registry. A new approval kind that is not a registry provider is a defect.
+
+### The large masthead draws on the desk
+
+Every page that opens with the journal's large masthead renders the masthead and the register straight on the desk, never inside the bound sheet. Record pages (a document, a person, a policy) keep the sheet, which carries its pinned ribbon.
+
+### A filter is never a tab bar
+
+A register's facets live in its Filters button. The ribbon is for leaves of a page only. The census and the rule are held by `scripts/__tests__/register-scope.test.ts`.

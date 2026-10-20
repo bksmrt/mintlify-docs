@@ -1,0 +1,103 @@
+---
+title: "Webhook delivery behavior"
+description: "How Proof delivers webhooks: success criteria, retry schedule, auto-disable, idempotency, and SSRF protection."
+sidebarTitle: "Delivery"
+---
+
+Proof delivers webhooks through a background worker that sweeps pending deliveries and POSTs them to your endpoints. Understanding the success criteria, retry logic, and failure handling helps you build reliable receivers and debug delivery issues.
+
+## Success criteria
+
+A delivery is considered successful when your endpoint returns any HTTP status in the 2xx range (200 through 299) within 10 seconds. Any other status code, a network error, or a timeout counts as a failure and triggers retry logic.
+
+## Timeout
+
+Every delivery attempt has a hard timeout of **10 seconds**. If your endpoint does not respond within that window, the attempt fails and the worker schedules a retry.
+
+## Retry schedule
+
+Proof retries failed deliveries with exponential backoff. The delay between attempts increases according to the following schedule:
+
+| Attempt | Delay after previous failure |
+| --- | --- |
+| 1st retry | 1 minute |
+| 2nd retry | 5 minutes |
+| 3rd retry | 30 minutes |
+| 4th retry | 2 hours |
+| 5th retry | 12 hours |
+
+After the final retry (5 attempts total), the delivery is marked as failed and no further attempts are made.
+
+<Note>
+  The retry schedule is the same shape used by the email retry queue. Delays are applied from the moment the previous attempt fails, not from the original event time.
+</Note>
+
+## Auto-disable
+
+If an endpoint accumulates **20 consecutive failed batches**, Proof automatically disables it. The UI shows the disabled reason: "Auto-disabled after 20 consecutive delivery failures."
+
+When you re-enable an endpoint from the webhooks UI, the failure streak resets to zero and deliveries resume normally.
+
+## Idempotency
+
+You can safely process the same event more than once without side effects:
+
+- **`X-Booksmart-Delivery`**: Each POST attempt carries a unique delivery ID. If Proof retries, each attempt gets a different delivery ID.
+- **`eventId`**: The envelope contains an `eventId` that is the same across all retry attempts for the same event occurrence.
+
+Best practice: store seen `eventId` values in a short-lived cache and skip processing for duplicates.
+
+## Ordering guarantee
+
+Proof does **not** guarantee in-order delivery. Events are emitted and delivered independently. If your logic depends on sequence (for example, a gap must be created before it is resolved), use the `eventId` and `occurredAt` timestamps to reconstruct order on your side.
+
+## SSRF protection
+
+Customer-supplied URLs are validated at two stages:
+
+1. **At endpoint creation**: The URL is checked against a blocklist of internal, private, loopback, and reserved IP ranges. If the URL resolves to a non-public address, the UI returns an error and the endpoint is not created.
+2. **At delivery time**: Every POST goes through a secure outbound fetch path, which re-resolves the hostname and re-validates IP addresses on every redirect hop. A public URL that redirects to a private address is still blocked.
+
+Supported protocols are `http:` and `https:`. Redirects are limited to 5 hops.
+
+## Delivery log in the UI
+
+The webhooks panel shows the last **50 deliveries** per endpoint, including:
+
+- Event type and timestamp
+- Delivery status (`pending`, `succeeded`, or `failed`)
+- Number of attempts and the maximum allowed
+- HTTP response status from your endpoint (if any)
+- Last error message (if any)
+
+Use this log to diagnose why an endpoint is failing before it hits the auto-disable threshold.
+
+## Test deliveries
+
+Click **Send test** on any endpoint row to queue a `ping` event. Test deliveries are processed through the same pipeline as real events, so they exercise your signature verification, timeout handling, and network path.
+
+## Retention
+
+Successfully delivered events are pruned automatically after **30 days**. Failed deliveries are retained indefinitely so you can inspect them for debugging.
+
+## Troubleshooting checklist
+
+| Symptom | Check |
+| --- | --- |
+| All deliveries failing | Verify your endpoint returns 2xx within 10 seconds |
+| Intermittent failures | Check for cold-start latency; your endpoint may be timing out |
+| Endpoint auto-disabled | Fix the receiver, then re-enable the endpoint in the UI |
+| SSL errors | Ensure your server presents a valid, non-expired certificate |
+| 401 in delivery log | Your endpoint may be rejecting the request before signature verification; check your middleware order |
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Event types and payloads" icon="list" href="/webhooks/events">
+    Browse every event type and its JSON payload shape.
+  </Card>
+
+  <Card title="Verify signatures" icon="shield" href="/webhooks/verify-signatures">
+    Learn how to cryptographically verify every delivery you receive.
+  </Card>
+</CardGroup>

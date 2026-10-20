@@ -1,0 +1,59 @@
+---
+title: "Document storage connectors"
+description: "Import evidence files into Proof from Google Drive, Microsoft OneDrive and SharePoint, Box, or Dropbox."
+sidebarTitle: "Overview"
+---
+
+Proof can import files directly from your institution's cloud storage and turn them into evidence documents. When you import a file, Proof downloads it, extracts text, creates searchable chunks, and, if you are working inside an active project, matches it against open evidence slots. The supported providers are Google Drive, Microsoft OneDrive, Microsoft SharePoint, Box, and Dropbox.
+
+You start an import from the evidence tab inside a project or engagement workspace. The dialog, labeled **Import from cloud**, lists any existing cloud connections and lets you connect a new account.
+
+## Supported providers and status
+
+| Provider | Status | Authentication |
+| --- | --- | --- |
+| Google Drive | Active | OAuth 2.0 |
+| Microsoft OneDrive | Active | OAuth 2.0 (Microsoft Graph) |
+| Microsoft SharePoint | Active | OAuth 2.0 (Microsoft Graph) |
+| Box | Active | OAuth 2.0 |
+| Dropbox | Active | OAuth 2.0 |
+| Mock (dev only) | Active | None |
+
+A real provider appears in the connect list only after your Proof administrator has configured its OAuth client credentials. If a provider is not configured, the UI shows it as unavailable.
+
+## Connect, browse, import, disconnect
+
+<Steps>
+  <Step title="Connect an account">
+    In the evidence tab, click **Import from cloud** and choose a provider. For most providers, Proof redirects you through the provider's OAuth consent screen. After you approve, the connection is ready.
+  </Step>
+  <Step title="Browse folders and files">
+    Select a connected account to open a folder browser. You can navigate through folders and breadcrumbs. Files that are not importable (for example, images or archives) are shown but marked as unsupported.
+  </Step>
+  <Step title="Import a file">
+    Click **Import** next to a supported file. Proof downloads the file, runs it through the same evidence pipeline as an uploaded document, and creates a new evidence document. The evidence tab refreshes automatically so the document appears.
+  </Step>
+  <Step title="Disconnect when needed">
+    An `institutional_admin` can disconnect an account from the integrations settings. Disconnection wipes the stored OAuth credentials but keeps the import history so provenance is preserved.
+  </Step>
+</Steps>
+
+## Which files can be imported
+
+A file is importable if its MIME type is in the supported set or if it is a text-based file. Supported types include PDF, Microsoft Word (.docx), Microsoft Excel (.xlsx), CSV, and plain text files. Google-native docs (such as Google Docs or Google Sheets) are exported to a readable format before import.
+
+Files that are not importable include images, zip archives, and RTF documents. These still appear in the browse view so you understand why they cannot be selected.
+
+## What happens after import
+
+1. **Document creation**: Proof creates an evidence document with the file name as its title.
+2. **Text extraction and chunking**: the file's content is extracted, split into chunks, and stored.
+3. **Background indexing**: embeddings are generated for search. If you imported the file while inside an engagement with an active project, Proof also runs evidence matching against open slots.
+4. **Idempotency**: importing the same file from the same connection a second time returns the existing document and marks it as already imported. The unique key is the combination of the connection and the provider's file ID.
+
+## Security and data handling
+
+- **Tokens are encrypted**: OAuth access and refresh tokens are encrypted at rest using the shared credential encryption helper. They are decrypted only when Proof needs to make an API call or refresh a token.
+- **No token exposure**: API responses list connection metadata (provider name, account identity, status) but never include the actual credentials.
+- **Tenant scoping**: every connection belongs to one institution. Cross-tenant access returns a 404.
+- **SSRF protection**: internal and private URLs are blocked at configuration time.

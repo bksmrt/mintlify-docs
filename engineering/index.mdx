@@ -1,0 +1,77 @@
+---
+title: "Engineering overview"
+description: "What Proof is, how the modular monolith is organized, and where to start reading the codebase."
+sidebarTitle: "Overview"
+---
+
+<Note>
+  This Engineering tab is private and visible only to signed-in Proof team members.
+</Note>
+
+Proof is a modular-monolith B2B SaaS platform that helps consulting firms manage accreditation and compliance for higher-education institutions across five regulatory tiers. One Express server serves a React SPA. All routes, workers, and background jobs live in the same deployable unit, partitioned by domain modules rather than microservices.
+
+## Architecture at a glance
+
+The server is a single Express application (`server/index.ts`) that mounts API routes from `server/routes.ts`, serves the Vite-built client, and starts background workers for parsing, SIS sync, regulatory intelligence, and report delivery. The client is a React SPA rendered with Vite, built on Tailwind CSS, Radix UI primitives (via Shadcn/ui), Framer Motion, and TanStack Query. PostgreSQL is the only database, extended with `pgvector` for embedding storage.
+
+Shared types and the Drizzle schema live in `shared/`, imported by both server and client. This keeps the runtime contract in one file: `shared/schema.ts` defines every table, enum, and relation, and `drizzle-zod` derives validators from it.
+
+## Stack
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS, Radix UI / Shadcn/ui, Framer Motion, TanStack Query |
+| Backend | Express.js, TypeScript, Node.js 22+ |
+| ORM & validation | Drizzle ORM, drizzle-zod, Zod |
+| Database | PostgreSQL 16 with pgvector extension |
+| Auth | Replit Auth, WorkOS |
+| AI / LLM | OpenAI, Anthropic, Google (Gemini) via the ai-routing module |
+| Payments | Stripe |
+| Build tool | Vite (client + server via tsx) |
+
+## Request lifecycle
+
+A typical request flows like this:
+
+1. **Ingress**: `express()` in `server/index.ts` applies `securityHeaders`, rate limiting, and JSON parsing.
+2. **Auth**: Session middleware (`express-session` with `connect-pg-simple`) populates `req.user`. SSO routes in `server/sso/` handle WorkOS and Replit Auth flows.
+3. **Routing**: `registerRoutes` in `server/routes.ts` mounts domain route groups (curriculum, compliance, approvals, billing, integrations, and so on).
+4. **Tenancy**: Every route resolves the caller's institution and firm scope. The `bksmrt` operator role is read-only on tenant data by default; see the [Bksmrt write policy](/engineering/foundations/tenancy-and-auth).
+5. **Handler**: Route handlers call domain modules under `server/modules/*`, shared helpers, or the Drizzle db client.
+6. **Response**: JSON responses are shaped with Zod schemas from `shared/`. The client SPA handles routing client-side; server-side navigation targets are validated by CI.
+
+## Key cross-cutting rules
+
+The codebase is held together by a small set of rules that apply everywhere. Each has its own engineering page:
+
+| Rule | What it governs | Where to read |
+| --- | --- | --- |
+| **Tenancy and auth** | Institution scoping, firm isolation, role matrices, the `bksmrt` operator read-only posture | [Tenancy and auth](/engineering/foundations/tenancy-and-auth) |
+| **Operator write policy** | Three-bucket classification for destructive routes: platform catalog, tenant data, and enumerated recovery actions | [Tenancy and auth](/engineering/foundations/tenancy-and-auth) (policy doc: `docs/bksmrt-write-policy.md`) |
+| **Approvals framework** | Dynamic Approval Framework: policy schema, resolver engine, no-code builder, and the kind registry | [Approvals framework](/engineering/foundations/approvals-framework) |
+| **Design contracts** | Canonical lists, marks, decisions, and registers; every redesign surface carries a completeness contract | [Contributing workflow](/engineering/contributing/workflow) and [Proof design kit](/engineering/design/proof-kit) |
+| **Database schema** | Single source of truth in `shared/schema.ts`, applied with `drizzle-kit push`, guarded by two CI schema jobs | [Database and migrations](/engineering/foundations/database-and-migrations) |
+
+## Per-area docs
+
+The repo carries deeper architecture notes under `docs/areas/`. Each file maps where things live for a domain cluster and collects the rules you need when touching that surface. Scan the first ~20 lines of any file for a one-paragraph gist.
+
+## Explore the engineering docs
+
+<CardGroup cols={2}>
+  <Card title="Foundations" icon="layer-group" href="/engineering/foundations/tenancy-and-auth">
+    Tenancy, auth, database, migrations, approvals, and AI services.
+  </Card>
+
+  <Card title="Product areas" icon="puzzle-piece" href="/engineering/areas/curriculum">
+    Curriculum, sections, teaching, standards, ethos, suggestions, integrations, and reporting internals.
+  </Card>
+
+  <Card title="Design" icon="palette" href="/engineering/design/proof-kit">
+    Proof editorial design kit and visual language.
+  </Card>
+
+  <Card title="Contributing" icon="code-branch" href="/engineering/contributing/workflow">
+    Workflow, branch rules, redesign governance, testing, and CI.
+  </Card>
+</CardGroup>

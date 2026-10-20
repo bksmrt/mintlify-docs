@@ -1,0 +1,136 @@
+---
+title: "Tenancy and authentication"
+description: "How Proof isolates tenants, resolves firm and institution context, and enforces role-based access control."
+sidebarTitle: "Tenancy and auth"
+---
+
+Proof is a single codebase serving many institutions and consulting firms. Every request must resolve which tenant it belongs to and what the caller is allowed to do. This page explains the storage-layer isolation model, how authentication works, how roles and permissions are resolved, and the strict write policies that protect tenant data.
+
+## Where things live
+
+| File | Purpose |
+| --- | --- |
+| `server/replitAuth.ts` | Replit OIDC session strategy, session middleware, and require-SSO enforcement |
+| `server/sso/` | WorkOS SSO connection storage, discovery routes, and domain verification |
+| `server/firmContext.ts` | Resolves the caller's consulting firm, engagements, and capabilities |
+| `server/firmWriteBoundary.ts` | Default-deny middleware: firms may not edit institution records |
+| `server/tenantUserHandlers.ts` | Tenant-scoped user directory, invites, and PATCH handlers |
+| `server/modules/permissions/user-permission-resolver.ts` | Per-user capability grants and governance write decisions |
+| `client/src/components/app-sidebar.tsx` | `SIDEBAR_ROLE_MATRIX`, which decides what nav items each role sees |
+| `docs/bksmrt-write-policy.md` | Full classification of the three-bucket write guard system |
+| `docs/tenancy-hardening-plan.md` | Checklist of storage-layer `institutionId` scoping and active-engagement gating |
+
+## Multi-tenancy model
+
+### Storage-layer scoping
+
+Every table that holds tenant data carries an `institutionId` column. Queries must filter on it. The tenancy hardening plan (`docs/tenancy-hardening-plan.md`) tracks the migration of every storage getter to accept `institutionId` and enforce `eq(table.institutionId, institutionId)`. Unsafe patterns such as `getProjectById` without an institution filter have been removed or renamed to internal-only helpers.
+
+### Firm-level isolation
+
+Consulting firms access institutions through active engagements only. `resolveFirmContext` in `server/firmContext.ts` resolves the caller's oldest active firm membership (deterministic tie-breaker by `createdAt`, then `id`) and loads the engagement team memberships for that firm. `getAccessibleInstitutionIds` and `getAccessibleEngagementIds` both filter to `status = "active"` and `acceptanceStatus = "accepted"`. A firm user cannot view data from an archived or pending engagement.
+
+### Firms versus institutions
+
+A person can belong to both a firm and an institution. The platform decides which hat the caller wears per request. If the caller is a member of the institution they are working in, they act as institutional staff and are subject to institutional role checks. If they are not a member of that institution, they act as the firm and are gated by the firm write boundary.
+
+### Engagements and capabilities
+
+An engagement is a contract between a firm and an institution. The institution can grant the firm write capabilities on that engagement via `visibilitySettings.capabilities`. `firmHasCapabilityForInstitution` checks whether the firm has at least one active engagement that grants the requested capability. Firm leadership does not bypass capability checks automatically; the institution is the source of truth for what a firm may write.
+
+## Authentication
+
+### Replit Auth
+
+Production authentication uses Replit OIDC. `server/replitAuth.ts` configures an `openid-client` Passport strategy against `https://replit.com/oidc`. Session cookies are stored in Postgres via `connect-pg-simple`, with `sameSite: "lax"` (required for the cross-site IdP callback) and `secure: true` outside development. The session timeout is user-configurable (30, 60, 120, or 480 minutes) and is rewritten on every request via `applyUserSessionTimeout`.
+
+### WorkOS SSO
+
+Enterprise SSO is backed by WorkOS. The `server/sso/` module stores SSO connections, verifies domains, and enforces `requireSso` per connection. If a user's email domain is bound to a connection with `requireSso = true`, Replit OIDC logins for that domain are refused and the user must sign in through WorkOS.
+
+### Dev login
+
+A dev login picker exists for local development only. It is enabled when `NODE_ENV !== "production"` and `ENABLE_DEV_LOGIN = "1"`. The endpoints return 404 in production. The picker offers seven seeded identities on the `@proofeducation.com` demo domain, each with a fixed role. See `replit.md` for the full persona list.
+
+## Roles and permissions
+
+### Institutional roles
+
+The primary institutional roles are `institutional_admin`, `compliance_officer`, `department_head`, `faculty`, `student`, and `auditor`. The `SIDEBAR_ROLE_MATRIX` in `client/src/components/app-sidebar.tsx` maps route paths to the roles that may see them. Items missing from the matrix are visible to all institutional roles by default (fail-open), so a new route does not silently disappear.
+
+### Governance capabilities
+
+Beyond the sidebar, write access to specific domains is controlled by capabilities. `server/modules/permissions/user-permission-resolver.ts` defines `CAPABILITY_DEFAULT_ROLES`, which maps each capability (`curriculum_write`, `policy_write`, `faculty_write`, `evidence_write`, `narrative_write`, `review_cycle_write`, `profile_write`, `control_write`) to the roles that may write it by default. `institutional_admin` is immune to explicit deny overrides to prevent lockout.
+
+The precedence for write decisions is:
+
+1. Explicit deny (highest)
+2. Explicit grant
+3. Role default (lowest)
+
+Read-only roles (`bksmrt`, `auditor`, `student`) never grant write access, but they also do not take away write access granted by another role.
+
+### Firm roles
+
+Firm roles are `owner`, `firm_owner`, `firm_admin`, `senior_consultant`, `consultant`, `associate`, and `viewer`. The `owner` (the firm creator) has blanket access to certain operations, such as disclosure dataset export. The `isMlReviewer` sub-role on `firm_users` gates ML reviewer operations separately from the firm role.
+
+## The bksmrt write policy
+
+`bksmrt` is the platform-operator role. It is structurally read-only on tenant data. Every destructive route must call one of three named guards as its first authorization step. The `bksmrt-write-lock-coverage` regression test scans `server/routes.ts` with the TypeScript AST and fails CI if a destructive route forgets a guard.
+
+### Bucket 1: `assertPlatformWrite`
+
+Allows bksmrt operators only. Used for routes that mutate the global platform catalog: parser definitions, regression fixtures, drift baselines, agency source records, trust-escalation decisions, and granting institution roles from Mission Control.
+
+### Bucket 2: `assertTenantWrite`
+
+The default for approximately 99% of destructive routes. Denies bksmrt in every view mode with `403 bksmrt_write_forbidden`. If a bksmrt operator needs to perform a tenant write outside the bucket-3 recovery actions, they must sign in as an institutional account.
+
+### Bucket 3: `assertSupportRecoveryWrite`
+
+Allows exactly four enumerated platform-support recovery actions on tenant projects:
+
+- `POST /api/projects/:projectId/rewind`
+- `POST /api/projects/:id/reset-stuck-status`
+- `POST /api/projects/:id/lift-validation-hold`
+- `POST /api/projects/:id/transfer-ownership`
+
+The guard is a tripwire: it hard-fails with `500 support_recovery_route_misconfigured` if attached to any other path. The bksmrt branch additionally requires a justification of at least 15 characters, and the rewind action requires `supportAction: true` on the body.
+
+### Helper-based enforcement
+
+Many destructive routes share scope-resolution helpers that already call the named guard internally. The coverage test maps these helpers in `GUARDED_HELPERS` and treats a call to one of them as guard satisfaction. Adding a route that uses one of these helpers does not require duplicating the guard call. See `docs/bksmrt-write-policy.md` for the full helper-to-guard mapping.
+
+### The mapping-assist carve-out
+
+A fourth bucket (standard-to-policy mapping assistance) exists as a paid onboarding add-on. On the mapping surface, a bksmrt operator may write only while focused on a single institution (`scope.write`, institution mode) and not while impersonating. Every such write is audit-logged with `mappingAssist: true`.
+
+## Firm write boundary
+
+Firms are read-only on institution data by design. `server/firmWriteBoundary.ts` implements a single default-deny middleware that blocks every state-changing `/api` request from a caller acting as a firm, unless the route is explicitly listed in `FIRM_PERMITTED_WRITES`. A route nobody thought about is therefore refused, which fails visibly (a consultant reports a button that 403s) instead of silently (a consultant rewrites a record nobody sees change).
+
+Permitted writes fall into these kinds:
+
+- **Personal**: notifications, pins, preferences, saved views
+- **Firm**: the firm's own records, team, engagements, and billing
+- **Surface**: comments, findings, evidence requests, and tasks addressed to institution staff
+- **Propose**: tracked narrative and policy suggestions, curriculum proposals
+- **Read**: POST requests that carry a body but write nothing
+- **Recompute**: derived data such as scores or search indexes
+
+The list is enforced by a CI test in `firmWriteBoundary.test.ts`: every entry must match a route that actually exists.
+
+## Audit logging
+
+Sensitive actions (tenant administration, approvals, invitations, imports, billing changes, support recovery actions, and impersonation) write durable audit rows. The audit captures the acting user and preserves the distinction between actor and effective subject during view-as flows. See `threat_model.md` for the full audit threat category.
+
+## Impersonation and view-as
+
+Platform operators may use view-as functionality to troubleshoot on behalf of users. During impersonation, bucket-1 writes are blocked with `403 platform_write_blocked_during_impersonation`, and the mapping-assist carve-out is disabled with `403 bksmrt_mapping_assist_impersonation`. The audit trail records both the operator and the effective user.
+
+## Related pages
+
+- [Authentication and SSO for integrations](/sso/overview)
+- [Database and migrations](/engineering/foundations/database-and-migrations)
+- [Approvals framework](/engineering/foundations/approvals-framework)
+- [Local development](/engineering/local-development)

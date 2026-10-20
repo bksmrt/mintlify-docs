@@ -1,0 +1,41 @@
+---
+title: "Core concepts"
+description: "How Proof scopes data across tenants, what user roles mean for integrations, and how the platform handles credentials and provenance."
+---
+
+Proof is built around institutions as tenants. Every record you create: projects, evidence, standards, and integrations: belongs to exactly one institution. The platform enforces this boundary at the route layer, so a user from one institution cannot read or write data from another. This applies to all integration endpoints, including SSO, SIS sync, cloud storage, and webhooks.
+
+## Institutions and multi-tenancy
+
+Each institution is an isolated tenant. When you connect an integration, you do so in the context of a single institution. A consulting firm that works with multiple institutions may have access to several tenants, but each engagement and its data remain scoped to the institution it serves. If a user tries to access a resource outside their allowed set, the request returns a 404 (not found) rather than a permission error.
+
+## Consulting firms and engagements
+
+Consulting firms use Proof to manage accreditation work on behalf of institutions. A firm creates an engagement with an institution, then builds projects, assigns consultants, and collects evidence within that engagement. Integrations such as cloud storage and SIS sync can be configured at the institution level, but imported data can be scoped to a specific engagement when appropriate.
+
+## User roles
+
+Proof assigns every user a primary role and a set of additional roles. The role values stored in the system are:
+
+| Role | Typical scope |
+| --- | --- |
+| `institutional_admin` | Full institution authority, including integration management and user provisioning |
+| `compliance_officer` | Compliance workflow oversight and review |
+| `department_head` | Department-level curriculum and faculty management |
+| `faculty` | Teaching, advising, and evidence contribution |
+| `auditor` | Read-only access for external review |
+| `advisor` | Student exception requests and audit history |
+| `dean`, `provost`, `president`, `board` | Strategic initiative approvers |
+
+For integration configuration, `institutional_admin` is the gating role. SSO and webhook setup require it, and only an `institutional_admin` can disconnect a cloud storage account or create an SSO connection.
+
+## Proof is not an SIS
+
+Proof is a compliance system, not a student information system. It does not maintain students, grades, enrollments, or registration. When you connect an SIS, Proof reads a mirror of curriculum and faculty data, but your SIS remains the system of record for academic records. Any data that Proof pulls from an SIS is clearly marked with provenance so you know where it came from.
+
+## Provenance and data handling
+
+- **SIS provenance**: records created or updated from an SIS sync carry a provenance marker (for example, the courses index shows "from SIS"). This helps teams distinguish institution-owned data from data that originated in an external system.
+- **Credential encryption**: OAuth tokens and SFTP credentials for integrations are encrypted at rest. The platform decrypts them only when needed to make an outbound API call or refresh a token. Decrypted credentials are never returned in API responses.
+- **Webhook payloads**: outgoing webhook events contain references (IDs, event types, timestamps) rather than full document or record bodies. Your consumer can use those identifiers to fetch details through the authenticated web app if needed.
+- **Disconnect behavior**: when you disconnect a cloud storage provider, Proof wipes the encrypted credentials but preserves the `storage_imports` provenance records. You do not lose the history of what was imported, but the connection can no longer browse or download files.

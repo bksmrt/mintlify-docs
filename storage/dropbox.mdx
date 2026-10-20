@@ -1,0 +1,46 @@
+---
+title: "Dropbox"
+description: "Connect a Dropbox account to Proof and import files from Dropbox folders as evidence."
+---
+
+Connect a Dropbox account to browse your Dropbox folders and import documents into a project's evidence library.
+
+## Before you start
+
+- Your Proof administrator must have configured the Dropbox OAuth client. If not, Dropbox shows as unavailable in the connect list.
+- Any member of your institution can connect an account from the **Import from cloud** dialog in a project's evidence tab.
+
+## Connect and import
+
+<Steps>
+  <Step title="Open the import dialog">
+    In a project's evidence tab, click **Import from cloud**, then choose **Dropbox**.
+  </Step>
+  <Step title="Approve access">
+    Sign in to Dropbox and allow access. Proof requests offline access so the connection keeps working without signing in again.
+  </Step>
+  <Step title="Browse your files">
+    Browsing starts at the root of your Dropbox. Open folders to navigate, and use the breadcrumb trail to go back.
+  </Step>
+  <Step title="Import a file">
+    Click **Import** next to a supported file. The file appears in the evidence tab when processing finishes.
+  </Step>
+</Steps>
+
+## How Proof decides what can be imported
+
+Dropbox does not report a file type, so Proof uses the file extension:
+
+| Extension | Importable |
+| --- | --- |
+| `.pdf`, `.docx`, `.xlsx`, `.xlsm`, `.csv`, `.txt`, `.md` | Yes |
+| Anything else | No, shown as **Unsupported** |
+
+<Note>
+  Proof identifies Dropbox files by their path. If you move or rename a file in Dropbox after importing it, a new import creates a new evidence document instead of returning the existing one.
+</Note>
+
+## Related
+
+- [Document storage overview](/storage/overview)
+- [Troubleshooting storage connections](/storage/troubleshooting)

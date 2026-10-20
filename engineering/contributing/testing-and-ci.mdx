@@ -1,0 +1,126 @@
+---
+title: "Testing and CI"
+description: "How tests are organized, what ratchets enforce quality, and what CI runs on draft versus ready PRs."
+---
+
+Proof uses Vitest for unit and integration tests, Playwright for end-to-end tests, and a set of ratchet scripts that prevent regressions across TypeScript strictness, test coverage, and design consistency.
+
+## Vitest projects
+
+`vitest.config.ts` splits tests into two projects so no file is collected twice:
+
+| Project | Environment | Includes | Excludes |
+| --- | --- | --- | --- |
+| `server` | `node` | All \`\*\*/\*.{test,spec}.?(c | m)[jt]s?(x)\` | `client/**`, `playwright/**`, `node_modules/**`, `dist/**` |
+| `client` | `jsdom` | \`client/\*\*/\*.{test,spec}.?(c | m)[jt]s?(x)\` | `playwright/**`, `node_modules/**`, `dist/**` |
+
+Both projects share the same alias resolution (including the `@shared/schema` pin to the TypeScript source) and the same setup file at `server/__tests__/setup.ts`. The `server` project deliberately excludes `client/**` so the `client` project owns those files.
+
+### Running tests
+
+```bash
+npm run test:server      # vitest --run --project server
+npm run test:client      # vitest --run --project client
+npm run check:server-tests  # server-test ratchet (blocking)
+npm run check:client-tests  # client-test ratchet (blocking)
+```
+
+## Integration tests
+
+`vitest.integration.config.ts` runs a separate suite against a real Postgres database. It deliberately omits the global db mock so tests hit actual tables. The config raises timeouts (`testTimeout: 30000`, `hookTimeout: 60000`) because the hybrid retrieval test makes live network calls to generate embeddings.
+
+Integration tests include:
+
+- `hybrid-retrieval.test.ts`: live embedding round-trips through the ai-routing service
+- `documentReadings.integration.test.ts`: document reads scoped to the passed context
+- `reconciliationRaces.integration.test.ts`: tidy-pass writes and proposal claim races
+- `curriculumDiscussion.integration.test.ts`: curriculum read gate and comment routes end to end
+- `programMapProposal.integration.test.ts`: modify program release and map proposal transactions
+
+Run them explicitly with:
+
+```bash
+npx vitest run --config vitest.integration.config.ts
+```
+
+## Playwright E2E
+
+End-to-end specs live in `playwright/`. Playwright is currently manual-only in CI because the E2E web server needs a full app environment (Postgres, session secret, database URL) that CI does not yet provision. The workflow `.github/workflows/playwright-e2e.yml` runs on `workflow_dispatch` only.
+
+Run locally with:
+
+```bash
+npm run e2e   # playwright test
+```
+
+## Ratchet tests
+
+Ratchet tests are under `scripts/__tests__/` and enforce that certain quality metrics only improve. Each ratchet reads a committed baseline and fails CI if the metric regresses.
+
+| Ratchet | Baseline file | What it guards |
+| --- | --- | --- |
+| `vl-marks.ratchet.test.ts` | `vl-marks.baseline.json` | Hand-rolled underline / border marks outside the canonical Mark module |
+| `vl17-frame.ratchet.test.ts` | `vl17-frame.baseline.json` | Standard-name badge frames outside the StandardName component |
+| `annotation-parity.ratchet.test.ts` | `annotation-parity.baseline.json` | Annotation callout coverage vs. the live contract |
+| `history-writes.ratchet.test.ts` | `history-writes.baseline.json` | Audit-trail coverage of destructive operations |
+| `single-role-checks.ratchet.test.ts` | `single-role-checks.baseline.json` | Role-gate consistency |
+| `check-tsc-ratchet.mjs` | `tsc-error-baseline.txt` | Strict TypeScript error count |
+| `check-vitest-project.mjs` | `server-test-quarantine.txt` / `client-test-quarantine.txt` | Server and client test failures per file |
+
+The TypeScript ratchet (`npm run check:tsc-ratchet`) locks in the already-cleared errors so no PR can regress. Lower the baseline with `npm run check:tsc-ratchet -- --update`. The server and client test ratchets use the same script: they compare the current failing files against a quarantine list and fail in both directions (a quarantined file that starts passing must be removed from the list).
+
+## Check scripts
+
+| Script | Purpose |
+| --- | --- |
+| `npm run check` | Runs `tsc` (advisory locally) |
+| `npm run check:tsc-ratchet` | Strict TypeScript ratchet gate |
+| `npm run check:agency-catalog` | Detects drift in the agency standards catalog |
+| `npm run check:branch-base` | Verifies the branch shares history with main |
+| `npm run check:endpoints` | Every client `/api` call has a matching server route |
+| `npm run check:route-links` | Every internal navigation target has a matching `<Route>` |
+| `npm run check:server-tests` | Server test ratchet |
+| `npm run check:client-tests` | Client test ratchet |
+
+## CI workflows
+
+### Branch hygiene
+
+`.github/workflows/branch-hygiene.yml` runs on every PR. It is fast (no DB, no build) and checks three things:
+
+1. `check-branch-base.mjs`: the branch shares history with main and is not stale.
+2. `check-endpoint-coverage.mjs`: client `/api` calls have matching server routes.
+3. `check-route-links.mjs`: navigation targets have matching `<Route>` entries in `App.tsx`.
+
+### Unit tests
+
+`.github/workflows/unit-tests.yml` runs on PRs and pushes to `main`.
+
+**On a draft PR**, only the quick steps run:
+
+- Dependency install
+- `npm audit --omit=dev --audit-level=high`
+- `npm run check:agency-catalog`
+- `npm run check:tsc-ratchet`
+
+**On a ready PR** (or any push to `main`), the full run includes:
+
+- The quick steps above
+- `npm run check:server-tests`
+- `npm run check:client-tests`
+- `npm run build`
+
+The workflow also runs two database jobs when schema-relevant files change:
+
+- **`schema-apply`**: applies the full schema to an empty Postgres (proves it is internally consistent).
+- **`schema-upgrade`**: applies `main`'s schema first, then pushes the PR's schema onto the populated database (catches enum recreation and unsafe column changes that break in-place upgrades).
+
+The **`integration`** job provisions a real `pgvector` Postgres, applies the schema, and runs `vitest.integration.config.ts`. It self-skips the semantic path when `OPENAI_API_KEY` is absent.
+
+### Playwright E2E
+
+`.github/workflows/playwright-e2e.yml` is manual-only (`workflow_dispatch`) until CI provisions the full app environment the E2E server needs.
+
+### CI minutes optimization
+
+The `changes` job in `unit-tests.yml` filters PR files so database jobs run only when the schema, migrations, server, or shared code changed. A file-count threshold of 3,000+ files causes the filter to default to running everything, because GitHub's file list is cut short and could miss a match. The rules are held by `scripts/__tests__/ci-minutes.test.ts`.

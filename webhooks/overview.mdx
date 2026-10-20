@@ -1,0 +1,111 @@
+---
+title: "Webhooks overview"
+description: "Receive signed, real-time POST notifications from Proof when syncs finish, gaps resolve, or billing events occur."
+sidebarTitle: "Overview"
+---
+
+Webhooks let your systems react to events in Proof as they happen. Instead of polling for changes, you register an HTTPS endpoint and Proof delivers a signed POST for each event you subscribe to. Common uses include updating a data warehouse when an SIS sync finishes, triggering an internal alert when a compliance gap resolves, or recording a billing state change in your ERP.
+
+Webhook management is available to institutional admin users from the Proof admin UI.
+
+## How webhooks work
+
+When a subscribed event occurs, Proof queues a delivery for each enabled endpoint that listens to that event type. A background worker then POSTs the signed event envelope to your URL. The entire flow is fire-and-forget: the action that triggered the event (for example, a sync run or gap resolution) completes even if your endpoint is temporarily unreachable.
+
+## Manage endpoints in the UI
+
+<Steps>
+  <Step title="Open the Webhooks panel">
+    Navigate to **Settings / Webhooks** in the Proof admin UI.
+  </Step>
+  <Step title="Add an endpoint">
+    Enter your HTTPS URL and select the event types you want to receive. You can subscribe to specific events or choose the wildcard (`*`) to receive every event type.
+  </Step>
+  <Step title="Copy the signing secret">
+    After creation, the UI displays the signing secret once. Copy it immediately and store it securely. Proof never shows the secret again.
+  </Step>
+  <Step title="Send a test delivery">
+    Click **Send test** on the endpoint row. Proof queues a `ping` event so you can verify connectivity and signature verification before going live.
+  </Step>
+  <Step title="Enable or edit the endpoint">
+    Use the toggle to enable or disable the endpoint. You can also update the event types or description at any time. Re-enabling an endpoint resets its failure streak.
+  </Step>
+</Steps>
+
+## Signing and verification
+
+Every delivery carries three headers:
+
+| Header | Purpose |
+| --- | --- |
+| `X-Booksmart-Signature` | HMAC-SHA256 signature with a timestamp, used to verify authenticity |
+| `X-Booksmart-Event` | The event type (for example, `sync.run.finished`) |
+| `X-Booksmart-Delivery` | A unique delivery ID for idempotency |
+
+The payload is a JSON envelope containing `eventId`, `eventType`, `institutionId`, `occurredAt`, and a `data` object. Your endpoint should verify the signature before trusting the payload. See [Verify signatures](/webhooks/verify-signatures) for the algorithm and sample verifiers.
+
+## Payload discipline
+
+Proof sends identifiers and lightweight metadata only. Full records (such as FERPA-protected roster data or complete gap documents) are never included. If your system needs detail, use the identifiers in the payload to look up the corresponding record inside the authenticated Proof web app.
+
+## Quick receiver example (Node.js / Express)
+
+This minimal endpoint verifies the signature and logs the event:
+
+```javascript
+const express = require("express");
+const crypto = require("crypto");
+
+const app = express();
+const SECRET = process.env.WEBHOOK_SECRET; // whsec_... from the UI
+
+function verifySignature(secret, payload, header) {
+  const parts = Object.fromEntries(header.split(",").map((kv) => kv.split("=")));
+  const t = Number(parts.t);
+  const v1 = parts.v1;
+  if (!Number.isFinite(t) || !v1) return false;
+  if (Math.abs(Math.floor(Date.now() / 1000) - t) > 300) return false;
+  const expected = crypto.createHmac("sha256", secret).update(`${t}.${payload}`).digest("hex");
+  const a = Buffer.from(expected, "hex");
+  const b = Buffer.from(v1, "hex");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+app.post("/hooks/proof", express.raw({ type: "application/json" }), (req, res) => {
+  const payload = req.body;
+  const sig = req.headers["x-booksmart-signature"];
+  if (!verifySignature(SECRET, payload, sig)) {
+    return res.status(401).send("Unauthorized");
+  }
+  const event = JSON.parse(payload);
+  console.log("Received", event.eventType, event.eventId);
+  res.status(200).send("OK");
+});
+```
+
+<Warning>
+  Always use `express.raw()` or an equivalent raw-body parser before the JSON parser. Signature verification requires the exact bytes that Proof POSTed. Parsing JSON first changes whitespace or encoding and breaks verification.
+</Warning>
+
+## Security notes
+
+- Secrets are generated as `whsec_` followed by 48 hex characters. Treat them as credentials.
+- Internal and private IP addresses are rejected when you add an endpoint URL. Proof validates the URL at creation time and again at every delivery to prevent SSRF.
+- Only institutional admin users can create, edit, or delete webhook endpoints.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Event types and payloads" icon="list" href="/webhooks/events">
+    See the full list of events and example JSON payloads for each.
+  </Card>
+
+  <Card title="Verify signatures" icon="shield" href="/webhooks/verify-signatures">
+    Learn the HMAC-SHA256 algorithm and get copy-paste verifier code.
+  </Card>
+
+  <Card title="Delivery behavior" icon="truck" href="/webhooks/delivery">
+    Understand retries, timeouts, auto-disable, and idempotency.
+  </Card>
+</CardGroup>

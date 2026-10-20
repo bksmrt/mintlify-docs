@@ -1,0 +1,140 @@
+---
+title: "Sync and field mapping"
+description: "How Proof's sync engine processes SIS records, resolves conflicts, and reports results."
+sidebarTitle: "Sync and field mapping"
+---
+
+When you connect an SIS and start a sync, Proof's engine fetches records from the vendor, applies your field mappings, reconciles changes against the local catalog, and writes the outcomes to a run report. Understanding this pipeline helps you read run results, fix mapping errors, and decide when to intervene.
+
+## Field mapping
+
+Before any record is written, the engine transforms each vendor field into the Proof field you mapped. You control this mapping in the connection wizard on a per-connection basis.
+
+### Default mappings
+
+Every vendor connector ships with default mappings. For example, the SFTP / CSV Drop connector maps the course number column to the Proof course number field by default. If your CSV uses different column names, you can override each mapping in the editor.
+
+### Transforms
+
+You can apply optional transforms to source values during the sync:
+
+| Transform | Effect | Example |
+| --- | --- | --- |
+| `uppercase` | Converts the value to uppercase | `bio` becomes `BIO` |
+| `trim` | Removes leading and trailing whitespace | `ENG` becomes `ENG` |
+| `to_int` | Parses the value as an integer | `"3"` becomes `3` |
+| `to_float` | Parses the value as a float | `"3.5"` becomes `3.5` |
+| `to_iso_date` | Parses and formats as an ISO date | Various formats become `YYYY-MM-DD` |
+
+### Required and optional fields
+
+A field marked required in the mapping editor must be present and non-empty for a record to be processed. If a required field is missing, the record is skipped and the reason appears in the run report.
+
+## The sync run engine
+
+A sync run proceeds through the following stages:
+
+<Steps>
+  <Step title="Lock and fetch">
+    The engine acquires a per-connection advisory lock so two runs for the same module cannot overlap. It then fetches pages of records from the vendor, respecting the vendor's pagination and any rate limits.
+  </Step>
+  <Step title="Apply mappings">
+    Each raw record is transformed using the connection's field mappings and transforms. Records that cannot be mapped are tagged with a warning.
+  </Step>
+  <Step title="Upsert in batches">
+    Mapped records are written to the catalog in batches of 500. For each row, the engine decides whether to create a new record, update an existing one, or skip it.
+  </Step>
+  <Step title="Archive missing records">
+    After a successful full sync, records that previously came from this connection but no longer appear in the vendor feed are archived. This keeps your catalog in sync with the SIS without leaving stale rows behind.
+  </Step>
+  <Step title="Record outcomes">
+    Every batch updates aggregated counters on the run (created, updated, skipped, archived, errored). Individual record states are recorded up to a cap of 500 per batch to keep storage bounded.
+  </Step>
+</Steps>
+
+## Run triggers
+
+You can start a sync run in several ways:
+
+| Trigger | How to start | Behavior |
+| --- | --- | --- |
+| Manual | Click **Run sync** on the connection panel | Runs immediately with the full module set |
+| Scheduled | Enable a schedule in the connection settings | Runs automatically at the chosen cadence |
+| Dry run | Choose **Dry run** before starting | Fetches and previews changes without writing to the catalog |
+| Test | Run a test connection during setup | Lightweight probe that validates credentials and lists files |
+| Full resync | Enable the full-resync option | Forces a fresh fetch, ignoring the high-water mark |
+
+## Scheduling options
+
+Recurring syncs are controlled by a per-connection schedule. You can set:
+
+- **Frequency**: hourly, daily, or weekly
+- **Time of day**: for daily and weekly runs (for example, `02:00`)
+- **Jitter**: a random offset in seconds (plus or minus) to spread load across the infrastructure
+
+Schedules only dispatch when the connection status is active. If a run fails with an authentication error, scheduled runs for that connection are skipped until the credentials are refreshed.
+
+## Reconciliation
+
+Reconciliation is a lightweight drift check that compares a sample of SIS records against the corresponding Proof records. It helps you confirm that fields you mapped are landing correctly over time. You can trigger a reconciliation manually from the connection panel. There is no automatic reconciliation on every run; it is intended as an occasional spot-check.
+
+## Conflict resolution
+
+When an incoming SIS record differs from the existing Proof record, the engine scores the change as one of three magnitudes:
+
+| Magnitude | What it means | Examples |
+| --- | --- | --- |
+| **Trivial** | No meaningful change | Last updated timestamp, source run identifier, or metadata-only differences |
+| **Minor** | Small semantic change | Title rephrasing with high Jaccard similarity (0.85 or above) |
+| **Major** | Structural or material change | New subject, course number, credits, department code, or a major rewrite |
+
+If you manually edit a field in Proof and the SIS later sends a different value for the same field, the engine detects the conflict. The current behavior flags these cases in the run data; a future release will surface them in a dedicated review queue where you can choose which value to keep.
+
+<Note>
+  New records always score as major, because the entire row is new. The engine also flags server-owned fields (such as the catalog year identifier) so they are never overwritten by a sync.
+</Note>
+
+## Run statuses
+
+Each sync run ends with one of the following statuses:
+
+| Status | Meaning |
+| --- | --- |
+| `running` | Currently in progress |
+| `completed` | All batches finished with no hard failures |
+| `failed` | A hard error stopped the run (for example, authentication failure or network timeout) |
+| `partial` | Some batches succeeded and others failed |
+| `stalled` | The run timed out or was abandoned |
+| `cancelled` | Cancelled by an operator |
+
+## Record outcomes
+
+Per-record outcomes appear in the run report:
+
+| Outcome | Meaning |
+| --- | --- |
+| **Created** | A new record was inserted into the catalog |
+| **Updated** | An existing record was modified |
+| **Skipped** | The record was ignored, usually because a required field was missing or the record was a duplicate |
+| **Archived** | The record no longer appears in the vendor feed and was archived |
+| **Errored** | The record could not be processed due to a database constraint, conflict, or unexpected error |
+| **Review queued** | The record has a conflict between a manual edit and the incoming SIS value |
+
+## Webhook events
+
+When a sync run finishes, Proof emits a webhook event you can consume:
+
+- `sync.run.finished` when the run completes or reaches a partial state
+- `sync.run.failed` when the run fails, stalls, or is cancelled
+
+These events include the run ID, connection ID, and final status. To learn how to receive and verify these events, see the [webhooks overview](/webhooks/overview) and [webhook events](/webhooks/events).
+
+## Run details and errors
+
+Open any finished run to see:
+
+- Aggregated counts per outcome
+- A per-record list (up to 500 rows per batch) with the external key, action, magnitude, and any error message or warning
+- Vendor metadata, such as the driver name or response diagnostics
+
+If a run shows a large number of skipped or errored records, review the field mappings first. Most errors stem from missing required fields, mismatched department codes, or column names that changed on the vendor side.

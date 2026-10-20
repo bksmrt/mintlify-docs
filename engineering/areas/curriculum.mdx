@@ -1,0 +1,130 @@
+---
+title: "Curriculum"
+description: "How Proof models catalog years, courses, programs, validation engines, proposals, and approval chains."
+sidebarTitle: "Curriculum"
+---
+
+The curriculum domain is Proof's structured space for catalog management: catalog years, courses, programs, sections, and the validation and approval pipelines that govern when each can be published. Every record is scoped to an institution and versioned through catalog years so that historical offerings remain auditable.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Curriculum routes (courses, programs, sections, catalog years, templates) | `client/src/App.tsx` (Route definitions under `/curriculum/*`) |
+| Redirects for legacy curriculum paths | `client/src/components/curriculum/CurriculumPathRedirect.tsx` |
+| Curriculum sidebar group | `client/src/components/app-sidebar.tsx` (gated by feature flag + role) |
+| Catalog year creation and roll-forward | `server/catalogYearService.ts` |
+| Course row resolution for a section's historical course | `server/courseRowResolution.ts` |
+| Course validation engine | `server/courseValidationService.ts` |
+| Course validation routes | `server/courseValidationRoutes.ts` |
+| Course approval finalize / revert | `server/courseApprovalFinalize.ts` |
+| Course diagnostic labels and hints | `client/src/components/curriculum/course-diagnostics-data.ts` |
+| Course editor diagnostic cards | `client/src/components/curriculum/course-diagnostics.ts` |
+| Course validation exemptions UI | `client/src/pages/course-validation-exemptions.tsx` |
+| Program validation engine | `server/programValidationService.ts` |
+| Program validation routes | `server/programValidationRoutes.ts` |
+| Program Studio pages | `client/src/pages/program-detail.tsx`, `client/src/pages/programs-list.tsx` |
+| Legacy program studio shell | `client/src/pages/program-studio.legacy.tsx` (kept for one release) |
+| Visual builders (prereq tree, program compare, sequence map) | `client/src/components/curriculum/graph/*`, `client/src/components/program-sequence-map.tsx` |
+| Curriculum proposal entity lock | `server/modules/curriculum-proposals/entity-lock.ts` |
+| Curriculum proposal validators | `server/modules/curriculum-proposals/validate-proposal-data.ts`, `server/modules/curriculum-validators/` |
+| Curriculum hierarchy validator | `server/modules/curriculum-hierarchy/validator.ts` |
+| Curriculum recommendations | `server/modules/curriculum-recommendations/` |
+| Demo seed institution data | `scripts/seed-demo-institution.ts` (BLOCK 3/4/8+) |
+| Role gates | `client/src/lib/role-gates.ts` (`canWriteCurriculum`, `isCurriculumApproverRole`) |
+| Permission resolver | `server/modules/permissions/user-permission-resolver.ts` |
+| Exemption core | `server/validation/exemption-core.ts` |
+
+## Catalog years and term classification
+
+A catalog year is a container that owns curriculum (courses, programs, learning outcomes) and academic terms. Catalog years are versioned through `academic_terms.catalog_year_id`, which is derived from term dates on every write and stored as a classification rather than a gate.
+
+Term-to-year resolution lives in `shared/catalog-year-resolution.ts` in `resolveCatalogYearForTerm` and `groupTermsByCatalogYear`. Precedence is containment first (a year whose window fully contains the term), then greatest overlap. Terms that fall outside every window are placed in an explicit **Unassigned** group rather than dropped. Only a genuine tie in overlap is marked `ambiguous`.
+
+A catalog year without a date window classifies nothing. `rollForwardCatalogYear` in `server/catalogYearService.ts` derives a default window from the year label when dates are not supplied. The `scripts/backfill-catalog-year-window.ts` script repairs legacy null windows, and `scripts/backfill-term-catalog-year.ts` matches terms against them.
+
+## Course identity and versioning
+
+Course identity uses a partial unique index on `(institutionId, subject, courseNumber) WHERE recordState='active'`. Versioning is per-catalog-year: the index includes `coalesce(catalogYearId, '')` as a fourth term so that two versions can coexist across years. A section resolves its historical course row through `server/courseRowResolution.ts`, which uses the section's persisted `catalog_year_id` to disambiguate when multiple rows share the same `version` string. Any new consumer of historical course rows must call this helper rather than re-implementing the lookup.
+
+## Validation engines
+
+Proof runs three validation engines: courses, sections, and programs. Each returns the same diagnostic shape (`ValidationDiagnostic[]`) so the `ValidationBanner`, exemptions flow, and transition routes consume them uniformly.
+
+### Course validation (`CRS_*`)
+
+The course validation engine lives in `server/courseValidationService.ts`. It composes existing helpers into a single pipeline:
+
+1. Load and field overlay
+2. Tenancy check
+3. Required fields
+4. Cross-field coherence (`checkCourseCoherence`)
+5. Organization hierarchy (`validateCourseHierarchy`)
+6. CIP and state inventory (`evaluateCatalogCompliance`)
+7. Instructional standards (fail open: `CRS_INSTRUCTIONAL_STANDARDS_CONFLICT`)
+8. Governance and lifecycle (`findEntityLockingProposal`)
+9. Catalog-of-record completeness (learning outcomes, outcome mappings, standard mappings; ethos-tuned severity)
+10. Domain K validators (fail closed: `CRS_DOMAIN_K_RUNTIME_ERROR`)
+11. Exemptions overlay (`exemption-core.ts`)
+
+Courses transition through `draft → review → approved → published`. `approved` and `published` are gated: `POST /api/courses/:id/request-approval` and `/publish` both re-run the engine and refuse with `422 { error, validation }` when `canPublish` is false. `PATCH /api/courses/:id` answers `400 use_transition_route` when the body would move into a gated status. The bulk status change (`POST /api/bulk/course`) reports held rows under `skipped`.
+
+The `request-approval` route files a Dynamic Approval Framework request with `subjectKind: "course"`. The chain's terminal step calls `finalizeCourseApproval` in `server/courseApprovalFinalize.ts`; reject and recall revert to `draft`.
+
+### Program validation (`PRG_*`)
+
+Program validation in `server/programValidationService.ts` mirrors the course engine. It adds program-specific checks:
+
+- Program coherence (`checkProgramCoherence`): date order, residency/elective credits vs total, GPA ladder, positive durations
+- Program credit floor (`evaluateProgramCreditFloor`): award-level floor, warning only
+- Duplicate scan (`findPotentialDuplicatePrograms`): fail open
+- Curriculum-map structure: no linked courses, unavailable linked courses, empty required groups, contradictory group bounds, group credits above total (all fail open)
+- Review standing (`computeProgramReviewStanding`): overdue warns, never-reviewed is info
+- Teach-out window enforcement at discontinue apply time (ethos-tuned: `off | warn | block`)
+
+`approved` and `published` are gated similarly. `POST /api/academic-programs` refuses creating straight into a gated status; the bulk change uses `partitionProgramIdsForTransition`.
+
+## Exemptions
+
+Each engine supports structured exemptions. Course and program exemptions re-use the shared `exemption-core.ts` scoring matrix but accept only entity and institution scopes. Section exemptions also accept term scope. The `ruleId` column exists for parity with structured compliance rules but is not yet required for any `CRS_*` or `PRG_*` code.
+
+## Curriculum proposals and entity locking
+
+A curriculum entity (course or program) is locked while a non-released curriculum project targets it via `metadata.entityRef`. The lock is read by `findEntityLockingProposal` in `server/modules/curriculum-proposals/entity-lock.ts` and enforced as both a validation diagnostic (`CRS_LOCKED_BY_PROPOSAL` / `PRG_LOCKED_BY_PROPOSAL`) and a 409 on direct `PATCH` or `DELETE`.
+
+A draft entity owned by a new proposal and a proposal saved as draft (`planning` status with `lifecycleStage: pending_proposal`) are intentionally **not** locked. Only submitted proposals and graduated work projects lock their target.
+
+## Roll-forward behavior
+
+`rollForwardCatalogYear` clones an existing year forward, shifting dates by whole years and bumping year tokens in term codes. It clones courses, programs, requirement groups, links, policies, exceptions, active learning outcomes, and academic terms. A term whose shifted code collides or whose shifted window would overlap a same-kind term is skipped and reported in `result.skippedTerms`.
+
+## Demo seed data
+
+The demo seed in `scripts/seed-demo-institution.ts` creates five chained catalog years with 2026-27 active, ten terms pinned to years, and 17 `courses` rows for nine courses (one per catalog year the course existed in). Seeded rows carry `is_seed = true` and are purged by `purgeSeedData()` with `--force`, which removes only rows the seed wrote. CS 101 is the rolled-forward ambiguity case, and CS 201 carries two versions across the active year.
+
+## Visual builders
+
+Three curriculum surfaces share a single ReactFlow + Dagre layout helper:
+
+- **Prerequisite Tree**: rendered on every course detail page via `PrereqTree`
+- **Program Compare**: side-by-side diff in Program Studio
+- **Program Sequence Map**: drag-and-drop term/course reorder with live prereq validation
+
+All three render through `CurriculumFlowChrome`, which owns ARIA-live regions, keyboard affordance, and the `variantStroke` edge palette. The sequence map runs a local prereq check before persisting; violations surface a confirmation dialog. Reorder mutations go through `POST /api/course-program-links/reorder-batch`, which wraps updates in a single `db.transaction(...)`.
+
+## Rules and gotchas
+
+- **Always join sections by `sections.id`**, reference internally by `sections.sectionId`, and display by `sections.sectionNumber` only. See [Sections](/engineering/areas/sections) for the full identifier discipline.
+- **Never compare catalog-year dates locally**; always go through `resolveCatalogYearForTerm` or `groupTermsByCatalogYear`. `toDateKey` exists because `catalog_metadata` stores `timestamp` and `academic_terms` stores `date`.
+- **Any new consumer of historical course rows must call `server/courseRowResolution.ts`**. Deriving a catalog year from dates would silently pick a different row than what the Catalog Years page shows.
+- **The course editor re-uses section editor components** (`PublishGate`, `ValidationBanner`) so the three engines surface problems the same way. The edit/view capability is a permission, not a diagnostic.
+- **Program Studio Phase D** is the current live surface. Legacy `?program=X&tab=Y&compareWith=Z` URLs are rewritten by `ProgramsIndexOrRedirect`. Rollback is a one-line `App.tsx` change.
+
+## Related pages
+
+- [Sections](/engineering/areas/sections)
+- [Instructional standards](/engineering/areas/instructional-standards)
+- [Ethos](/engineering/areas/ethos)
+- [Teaching and faculty](/engineering/areas/teaching-and-faculty)
+- [Approvals framework](/engineering/foundations/approvals-framework)
+- [Database and migrations](/engineering/foundations/database-and-migrations)

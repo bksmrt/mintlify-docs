@@ -1,0 +1,62 @@
+---
+title: "Troubleshooting storage connections"
+description: "Fix cloud storage connection statuses, OAuth errors, and failed imports in Proof."
+sidebarTitle: "Troubleshooting"
+---
+
+## Connection statuses
+
+Each storage connection shows a status badge in **Settings > Storage** and in the **Import from cloud** dialog.
+
+| Status | Meaning | What to do |
+| --- | --- | --- |
+| **Connected** | Ready to browse and import. | Nothing. |
+| **Connecting…** | The provider sign-in was started but not finished. | Finish the provider sign-in, or start the connection again. |
+| **Needs attention** | Proof could not get or refresh access. The settings page shows the provider's error message. | Click **Reconnect** in the import dialog and sign in again. |
+| **Disconnected** | An administrator disconnected the account. Import history is kept. | Connect the account again if you still need it. |
+
+## Errors after signing in to the provider
+
+If the provider sends you back to Proof with an error, the page URL includes `storage=error` and a `reason` value.
+
+<AccordionGroup>
+  <Accordion title="token_exchange_failed">
+    The provider rejected Proof's request for access. Common causes are a denied consent screen, a Microsoft 365 tenant that requires admin approval, or a misconfigured OAuth client. The connection moves to **Needs attention**, and its error message explains the cause. Try again, or contact your Proof administrator if it persists.
+  </Accordion>
+  <Accordion title="state_mismatch or bad_state">
+    The sign-in request was stale or altered, for example because you started two connections at once or used the browser back button. Start the connection again from **Import from cloud**.
+  </Accordion>
+  <Accordion title="missing_code_or_state">
+    The provider returned without completing sign-in, usually because you cancelled. Start the connection again.
+  </Accordion>
+  <Accordion title="connection_not_found">
+    The pending connection does not belong to an institution you can access, or it was removed. Make sure you are signed in to Proof as the same user who started the connection.
+  </Accordion>
+</AccordionGroup>
+
+## Provider shows as unavailable
+
+A provider appears in the connect list only when your Proof administrator has configured its OAuth client credentials. Trying to connect an unconfigured provider fails with `provider_not_configured`. Ask your Proof administrator to set it up.
+
+## Import errors
+
+| Message | Cause | Fix |
+| --- | --- | --- |
+| **Unsupported** label on a file | The file type cannot be read. | Save it as PDF, DOCX, XLSX, CSV, or TXT and import that copy. |
+| `imported file produced no extractable text` | The file has no text, such as a scanned PDF of images or an empty file. | Run OCR on the file or import a text-based version. |
+| `token refresh failed; reconnect required` | The provider revoked or expired Proof's access. | Reconnect the account. |
+| `engagement not accessible for this connection` | The project's engagement belongs to a different institution than the connection. | Use a connection from the engagement's institution. |
+| **Already imported** | This file was imported from this connection before. | No action needed. Proof returns the existing evidence document. |
+
+## Who can connect and disconnect
+
+- **Connect**: any member of the institution, so faculty and compliance staff can import from the evidence tab.
+- **Disconnect**: an `institutional_admin`, or a firm consultant with access to an engagement at that institution. Disconnecting removes stored credentials for everyone at the institution.
+
+## Related
+
+- [Document storage overview](/storage/overview)
+- [Google Drive](/storage/google-drive)
+- [OneDrive and SharePoint](/storage/onedrive-sharepoint)
+- [Box](/storage/box)
+- [Dropbox](/storage/dropbox)

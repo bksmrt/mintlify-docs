@@ -1,0 +1,110 @@
+---
+title: "Configure SSO"
+description: "Step-by-step guide to creating, testing, and activating an SSO connection in Proof."
+sidebarTitle: "Configure"
+---
+
+You create and manage SSO connections from the **Single Sign-On** panel in the Proof admin UI. The path is `/admin/sso` for institutions and the equivalent firm admin path for consulting firms.
+
+## Create a connection
+
+<Steps>
+  <Step title="Open the SSO panel">
+    Navigate to **Single Sign-On** in your tenant admin settings.
+  </Step>
+  <Step title="Add a connection">
+    Click **Add Connection**. In the dialog, enter a display name, such as "Okta" or "Azure AD".
+  </Step>
+  <Step title="Choose a default role">
+    Select the default role for users who do not match any role mapping rule. The options are:
+
+    - `institutional_admin`
+    - `compliance_officer`
+    - `department_head`
+    - `faculty`
+    - `auditor`
+  </Step>
+  <Step title="Require SSO (optional)">
+    Check **Require SSO for users on matched domains (block fallback login)** if you want to block standard sign-in for users on verified domains.
+  </Step>
+  <Step title="Create the draft">
+    Click **Create draft**. The connection starts in **draft** status.
+  </Step>
+</Steps>
+
+<Note>
+  New connections are WorkOS-backed. You do not upload IdP secrets in Proof. Instead, you configure the IdP through the WorkOS Admin Portal.
+</Note>
+
+## Configure the IdP through WorkOS
+
+After creating the connection, open its detail panel and click **Configure SSO**. This opens the WorkOS Admin Portal in a new tab, where you enter your IdP metadata.
+
+- For **SAML** providers, you paste the IdP metadata URL or XML.
+- For **OIDC** providers, you enter the issuer, client ID, and client secret.
+
+WorkOS stores the secrets and handles the protocol handshake. Proof never sees the raw client secret or private key.
+
+## Add and verify email domains
+
+Before you can activate the connection, you must verify at least one email domain.
+
+<Steps>
+  <Step title="Add a domain">
+    In the **Email Domains** section, type your domain (for example, `acme.edu`) and click **Add**.
+  </Step>
+  <Step title="Add the TXT record">
+    Proof shows a TXT record name and value. Add the TXT record to your DNS:
+
+    ```text
+    Name:  acme.edu
+    Value: bksmrt-sso-verify=<token>
+    ```
+
+    You can also add it to `_bksmrt-sso.acme.edu` if you prefer.
+  </Step>
+  <Step title="Verify">
+    Return to Proof and click **Verify**. Proof queries DNS and, if the record is found, marks the domain as **verified**.
+  </Step>
+</Steps>
+
+You can add multiple domains to a single connection. Only verified domains are used for email lookup at sign-in.
+
+## Test the connection
+
+Before going live, click **Test** on the connection detail panel. Proof runs a protocol-aware dry-run check that does not start a real sign-in flow.
+
+The test results show:
+
+- **Checks**: individual pass or fail items, such as OIDC discovery, JWKS reachability, or IdP certificate validity.
+- **Round-trip**: whether Proof successfully reached the IdP and received a meaningful response.
+
+A passing test means the connection is ready to activate. A failing test shows the specific check that did not pass, along with an error detail.
+
+## Activate or disable
+
+Once you have at least one verified domain and the test passes, click **Activate**. The connection becomes **active** and users on verified domains are redirected to your IdP.
+
+To pause SSO for the tenant, click **Disable**. Disabling a connection immediately revokes all active sessions tied to it, forcing users to re-authenticate.
+
+To remove a connection permanently, click the delete button. Deleting also revokes all sessions and removes the connection from the tenant.
+
+## Force logout all
+
+If you need to terminate every active SSO session for the tenant at once, click **Force logout all**. This revokes all sessions across every connection for the tenant. Users are signed out immediately and must re-authenticate on their next visit.
+
+## Troubleshooting common errors
+
+| Error | Cause | Resolution |
+| --- | --- | --- |
+| "Connection requires at least one verified email domain before activation" | You tried to activate before adding a verified domain. | Add a domain, publish the TXT record, and verify it. |
+| "Public mailbox domains (gmail.com, outlook.com, etc.) cannot be claimed" | You tried to add a consumer email domain. | Use your organization's domain, such as `university.edu`. |
+| "Domain is already claimed by another connection" | Another tenant has already verified this domain. | Contact the other tenant's admin, or use a different domain. |
+| "Invalid domain format" | The entered text is not a valid domain. | Remove `https://`, paths, and `@` symbols. Enter only the domain, such as `acme.edu`. |
+| "DNS lookup did not find the TXT record" | The TXT record is missing or has not propagated. | Wait for DNS propagation, then click **Verify** again. |
+| "Could not start SSO sign-in" | The connection status is not active, or WorkOS configuration is incomplete. | Confirm the connection is active and that the IdP setup in the WorkOS Admin Portal is complete. |
+| "Sign-in failed" (redirect to `/?sso_error=...`) | The IdP rejected the authentication, or the user does not have access. | Check the IdP logs and the Proof SSO audit log for the specific failure reason. |
+
+## SAML service provider metadata
+
+If your IdP requires Proof's SP metadata, and the connection protocol is SAML, the detail panel shows a **SP Metadata** download button. The XML contains the Assertion Consumer Service URL and entity ID for the connection.

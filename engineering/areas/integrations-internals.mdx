@@ -1,0 +1,170 @@
+---
+title: "Integrations internals"
+description: "How the public integration surfaces work under the hood: SIS engine, storage connectors, webhooks, and SSO."
+sidebarTitle: "Integrations internals"
+---
+
+The public integration surfaces (SIS, cloud storage, SSO, and webhooks) are thin policy layers over a set of internal modules. This page describes the engine files, vendor adapters, delivery workers, and protocol flows that power them. For customer-facing behavior, see the public pages.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| SIS integration routes | `server/modules/integrations/routes.ts` |
+| SIS engine | `server/modules/integrations/core/runEngine.ts` |
+| SIS scheduler and queue | `server/modules/integrations/core/scheduler.ts`, `syncQueue.ts` |
+| Field mapping | `server/modules/integrations/core/fieldMapping.ts` |
+| Reconciliation | `server/modules/integrations/core/reconciliation.ts` |
+| Conflict resolution | `server/modules/integrations/core/conflictResolution.ts` |
+| Write-back engine | `server/modules/integrations/core/writeback/writeEngine.ts` |
+| Write-back enqueue | `server/modules/integrations/core/writeback/enqueueForProject.ts` |
+| Credential encryption | `server/modules/integrations/core/credentialEncryption.ts` |
+| Sample files | `server/modules/integrations/core/sampleFiles.ts` |
+| Vendor registry and adapters | `server/modules/integrations/vendors/` |
+| Storage connectors | `server/modules/integrations/storage/` |
+| Webhook emitter | `server/webhooks/emitter.ts` |
+| Webhook signer | `server/webhooks/signer.ts` |
+| Webhook delivery worker | `server/webhooks/deliveryWorker.ts` |
+| SSO routes | `server/sso/routes.ts` |
+| WorkOS engine | `server/sso/workos.ts` |
+| Protocol gating | `server/sso/protocolGating.ts` |
+
+## SIS engine
+
+`server/modules/integrations/core/runEngine.ts` drives every sync run. It takes a connection, fetches pages through the vendor adapter, maps fields, resolves conflicts, batches upserts, archives missing rows, and records per-row outcomes. The engine forces every non-production, non-primary connection into a dry run.
+
+Key behaviors:
+
+- An advisory lock guards each per-connection run so overlapping syncs cannot corrupt state.
+- Departments are applied first across pages, whatever order the vendor sends them.
+- The archive step runs only on full resyncs, not incremental ones.
+- Outcomes are recorded in `integration_sync_record_states`.
+
+`server/modules/integrations/core/scheduler.ts` and `syncQueue.ts` queue runs via pg-boss. Workers in `server/workers/sis-sync-worker.ts` poll the queue unless `SIS_SYNC_WORKER_ENABLED=false`.
+
+### Field mapping and conflict resolution
+
+`fieldMapping.ts` holds vendor default mappings plus per-connection overrides. Supported transforms are `uppercase`, `trim`, and `to_int`.
+
+`conflictResolution.ts` sizes changes as `trivial`, `minor`, or `major`. Structural fields are always major, and Jaccard similarity below 0.85 is major. `conflictedFields` is computed when a manual override exists, but the read-side review queue that would act on it is not yet built.
+
+### Write-back
+
+Write-back lives in `server/modules/integrations/core/writeback/`. It updates existing SIS rows only, never creates. `enqueueForProject.ts` queues jobs when a committee approves a project, but only when `curriculumOwnership` is `split` and the connection has write-back enabled.
+
+Outcomes: `applied`, `skipped`, `conflict`, `failed`.
+
+Workers are in `server/workers/sis-writeback-worker.ts`, gated by `SIS_WRITEBACK_WORKER_ENABLED`.
+
+### Vendor adapters
+
+| Vendor | Manifest status | Reads | Writes | Notes |
+| --- | --- | --- | --- | --- |
+| `sftp-csv` | active | courses, departments, programs, terms, faculty | no | `ssh2-sftp-client`; `config.inlineCsv` for tests |
+| `mock` | active | all (including profile, evidence) | yes | Dev-only; the only adapter implementing `institutional_profile` and `evidence` reads |
+| `banner` | beta | Ethos REST | PATCH | No sandbox run exists yet |
+| `colleague` | beta | Colleague Web API | yes | No sandbox run exists yet |
+| `workday` | beta | Workday Student REST | yes | OAuth2; no sandbox run exists yet |
+| `peoplesoft` | coming_soon | throws | throws | Stub |
+| `jenzabar` | coming_soon | throws | throws | Stub |
+
+The DB enum `integration_vendor_id` lists exactly these seven. `_shared/readSupport.ts` `MODULE_READ_ENTITIES` covers only curriculum and faculty, so no real vendor feeds profile or evidence.
+
+### Naming traps
+
+- `server/ethos/` is Institutional Ethos (per-tenant tuning presets), not Ellucian Ethos. The only Ellucian Ethos code is the Banner adapter.
+- `catalogIngestionService` / `catalogSyncService` handle the accreditor standards catalog, not course catalogs.
+- IPEDS data comes from the College Scorecard API, not from an SIS.
+
+## Storage connectors
+
+`server/modules/integrations/storage/` provides document-storage connectors for Google Drive, Microsoft OneDrive and SharePoint, Box, and Dropbox, plus a dev-only mock. Storage connectors are interactive OAuth accounts that users browse on demand; they are separate from the scheduled SIS feeds.
+
+### Contract and registry
+
+`core/types.ts` defines the `StorageConnector` contract. `core/registry.ts` mirrors the SIS registry pattern. Providers self-register at import time via `providers/index.ts`.
+
+`core/service.ts` offers `getAuthorizedContext` (decrypt and refresh tokens) and `importFileAsEvidence` (download into the evidence pipeline). Credentials are encrypted with the shared `credentialEncryption` helper under `INTEGRATION_CREDENTIAL_KEY`.
+
+### Provider details
+
+| Provider | Env vars | Notes |
+| --- | --- | --- |
+| Google Drive | `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET` | Drive v3; native docs exported to `text/plain` |
+| Microsoft (OneDrive + SharePoint) | `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET`, `MS_GRAPH_TENANT_ID` | Three-level tree: sites → drives → items; SSRF guard on cursor prefix |
+| Box | `BOX_CLIENT_ID`, `BOX_CLIENT_SECRET` | Box API v2.0 |
+| Dropbox | `DROPBOX_CLIENT_ID`, `DROPBOX_CLIENT_SECRET` | Path-based ids; lowercased paths as stable ids |
+| Mock | none | Deterministic in-memory drive for dev and demos |
+
+### Flow
+
+- **Connect**: `POST /api/institutions/:institutionId/storage/connections` with `{ provider }`. Real providers return an `authorizeUrl`; the mock connects instantly.
+- **Browse**: `GET /api/integrations/storage/connections/:id/browse?folderId=&cursor=` returns entries, cursor, and breadcrumb.
+- **Import**: `POST /api/integrations/storage/connections/:id/import` with `{ fileId, engagementId? }`. Downloads the file, runs it through `processDocumentImport`, and indexes chunks. Idempotent via a unique `storage_imports` index.
+- **Disconnect**: `DELETE` wipes credentials but preserves `storage_imports` provenance.
+
+Routes are scoped to the caller's accessible institutions. Cross-tenant access returns 404.
+
+## Webhooks
+
+### Emitter
+
+`server/webhooks/emitter.ts` provides `emitWebhookEvent`. It is fire-and-forget: it inserts one pending delivery row per enabled, subscribed endpoint, then returns the count. It never throws, so a webhook failure cannot break the action that triggered it.
+
+Payload discipline is strict: callers pass IDs and event metadata only. Full FERPA or roster records are never included.
+
+Event types: `sync.run.finished`, `sync.run.failed`, `compliance.gap.resolved`, `project.status.changed`, `billing.*`, and `ping`.
+
+### Signer
+
+`server/webhooks/signer.ts` implements Stripe-style HMAC-SHA256 over `${timestamp}.${payload}`. The header format is `t=<unix>,v1=<hex>`. `verifyWebhookSignature` accepts a tolerance window (default 300 seconds) and uses `timingSafeEqual`.
+
+### Delivery worker
+
+`server/webhooks/deliveryWorker.ts` runs the sweep. It claims due deliveries, POSTs them through `safeOutboundFetch` (SSRF-critical), applies exponential backoff on failure, and auto-disables endpoints after 20 consecutive batch failures.
+
+Backoff schedule: 1, 5, 30, 120, 720 minutes. Timeout is 10 seconds. Batch size is 50. Succeeded deliveries older than 30 days are pruned automatically.
+
+### Emitting a new event
+
+To add a new event type:
+
+1. Append the literal to the `WebhookEventType` union in `server/webhooks/emitter.ts`.
+2. Call `emitWebhookEvent(institutionId, eventType, data)` from the triggering action.
+3. The emitter handles subscription filtering and queue insertion. No route or worker changes are needed.
+
+## SSO
+
+### WorkOS flow
+
+Proof's SSO is backed by WorkOS. `server/sso/workos.ts` lazily constructs the WorkOS SDK client from `WORKOS_API_KEY` and `WORKOS_CLIENT_ID`. It mints Admin Portal links for tenant administrators, drives the OAuth-style sign-in dance, and dispatches Directory Sync webhooks for JIT provisioning.
+
+Local state retains:
+
+- The per-tenant `SsoConnection` row, stamped with the WorkOS Organization id
+- DNS-TXT email-domain claiming
+- Role rules, role evaluator, and JIT provisioning
+- Tenant membership lifecycle
+- Audit log and session revocation
+
+### Retired in-house path
+
+The in-house OIDC and SAML engines are retired. They are gated behind the operator-only env flag `ENABLE_INHOUSE_OIDC=1` in `server/sso/protocolGating.ts`. New connections must use `protocol=workos`. OIDC login is allowed only when the escape hatch is on; SAML is never allowed directly (WorkOS speaks SAML on Proof's behalf).
+
+Do not revive the in-house path. It exists only as a migration escape hatch for operators and should not be documented to customers.
+
+## Rules and gotchas
+
+- **Only a production, primary SIS connection writes.** Every other connection is forced into a dry run. Connections are created as `sandbox` by default.
+- **Storage credentials are encrypted with `INTEGRATION_CREDENTIAL_KEY`.** Without it, dev uses an ephemeral key and real-provider tokens do not survive restart.
+- **Webhook payloads never contain full records.** Consumers must call back into the app.
+- **The WorkOS client is a lazy singleton.** The server boots even when WorkOS secrets are missing; the first call site that actually uses WorkOS throws a clear error.
+- **SIS write-back fires on committee approval today.** Guard this carefully if you change the ownership model. See `docs/integrations/sis-integration.md` for the full defect index and planned slices.
+
+## Related pages
+
+- [SIS overview](/sis/overview)
+- [Webhooks overview](/webhooks/overview)
+- [SSO overview](/sso/overview)
+- [Storage overview](/storage/overview)
+- [Database and migrations](/engineering/foundations/database-and-migrations)
