@@ -40,7 +40,7 @@ The chosen posture lives in **two places that must agree**:
 1. **Source of truth (versioned):** `institutional_ethos` head → `institutional_ethos_versions.operations_axis_preset` / `student_axis_preset`. This is what `loadEffectiveEthos` reads and what the Institution Profile shows.
 2. **Denormalized read columns:** `institutional_profiles.operations_preset` / `student_preset`. These are what `getEthosTuning`, the GET `/api/institution/ethos` endpoint, and the student/teaching match modules actually read.
 
-**Invariant:** `saveEthos` writes both in one transaction and invalidates the resolver's per-institution tuning cache. If you add a new write path, it must set both stores or the disconnect returns. `scripts/20260827_ethos_backfill_profile_presets.sql` heals rows saved before the invariant existed.
+**Invariant:** `saveEthos` writes both in one transaction and invalidates the resolver's per-institution tuning cache. If you add a new write path, it must set both stores or the disconnect returns. `migrations/20260827_ethos_backfill_profile_presets.sql` heals rows saved before the invariant existed.
 
 ## Ethos consumption map
 

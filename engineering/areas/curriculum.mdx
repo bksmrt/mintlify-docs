@@ -11,7 +11,7 @@ The curriculum domain is Proof's structured space for catalog management: catalo
 | Concern | File or module |
 | --- | --- |
 | Curriculum routes (courses, programs, sections, catalog years, templates) | `client/src/App.tsx` (Route definitions under `/curriculum/*`) |
-| Redirects for legacy curriculum paths | `client/src/components/curriculum/CurriculumPathRedirect.tsx` |
+| Redirects for legacy curriculum paths | `CurriculumPathRedirect` in `client/src/App.tsx` |
 | Curriculum sidebar group | `client/src/components/app-sidebar.tsx` (gated by feature flag + role) |
 | Catalog year creation and roll-forward | `server/catalogYearService.ts` |
 | Course row resolution for a section's historical course | `server/courseRowResolution.ts` |
