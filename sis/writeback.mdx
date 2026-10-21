@@ -34,7 +34,7 @@ Before enabling writeback, confirm the following:
 
 <Steps>
   <Step title="Open the connection settings">
-    Go to **Settings > Integrations**, open the vendor connection, and navigate to the writeback configuration tab.
+    Writeback runs on vendor API connections, which Proof manages for you. Contact Proof support to open the writeback configuration for your connection.
   </Step>
   <Step title="Turn on writeback">
     Toggle the master switch to enable writeback for this connection.
@@ -43,7 +43,7 @@ Before enabling writeback, confirm the following:
     Select which entity types you want to allow for writeback. By default, no entities are enabled. You must explicitly opt in each one.
   </Step>
   <Step title="Set the schedule">
-    Choose when queued jobs should run. Options include every 15 minutes, hourly, daily, weekly, or off. When set to off, jobs wait in queue until an operator clicks **Apply Now**.
+    Choose when queued jobs should run. Options include every 15 minutes, hourly, daily, weekly, or off. When set to off, jobs wait in queue until someone clicks **Run now** on the job in **SIS Write-Back Jobs**.
   </Step>
   <Step title="Save and verify">
     Save the configuration. You can trigger a manual writeback job from the connection panel to verify connectivity before relying on scheduled runs.
@@ -89,11 +89,13 @@ If the SIS returns rate-limit responses (HTTP 429) or transient server errors, t
 
 ## Conflict resolution UI
 
-When a writeback row returns a conflict, it appears in the writeback conflicts screen. An institutional admin or a compliance officer with the SIS management grant can:
+When a writeback row returns a conflict, it appears in **SIS Write-Back Conflict Queue**. An institutional admin or a compliance officer with the SIS management grant clicks **Resolve** on the row. The **Resolve write-back conflict** dialog shows **Catalog (proposed)**, **SIS (last known baseline)**, and **SIS (observed now)** side by side, then offers three choices:
 
-- **Resolve**: accept the Proof value and retry the write
-- **Skip**: leave the SIS value in place and remove the row from the queue
-- **Retry**: re-attempt the write later (for example, after the SIS record is updated)
+- **Local wins — apply catalog → SIS**: push the Proof value to the SIS
+- **Remote wins — pull SIS → catalog**: keep the SIS value and update Proof to match
+- **Merge — push a hand-curated value to SIS**: pick a side per field with **Use catalog** or **Use SIS**, or edit the value directly
+
+In **SIS Write-Back Jobs**, each job row also has **Retry** and **Skip** buttons.
 
 ## Monitoring writeback jobs
 

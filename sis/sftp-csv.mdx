@@ -14,20 +14,20 @@ The connector looks for five files per drop: `courses.csv`, `departments.csv`, `
   <Step title="Prepare the SFTP server">
     Ensure your institution runs an SFTP server that Proof can reach from the public internet. You need the host name, port (22 by default), and a username.
   </Step>
-  <Step title="Create the credential">
-    In Proof, go to **Settings > Integrations** and select **SFTP / CSV Drop**. Enter the host, port, username, and either a password or a private key (with optional passphrase).
+  <Step title="Open the connect dialog">
+    In Proof, open **Settings**, select the **Integrations** tab, and find the **Student records** section. Click **Connect the registrar’s drop**.
   </Step>
-  <Step title="Set the remote directory">
-    Provide the path on the server where your institution drops the files. If you leave this blank, Proof uses the user's home directory.
+  <Step title="Enter the server details">
+    Fill in **Server**, **Port** (22 by default), **Folder**, and **Signs in as**. Enter a **Password**, or paste a key under **Or a private key**.
   </Step>
-  <Step title="Choose modules and run a test">
-    Enable the **curriculum** and/or **faculty** module. Run a test connection so Proof can list the files, read their headers, and confirm row counts before the first real sync.
+  <Step title="Test the folder">
+    Click **Test the folder**. Proof lists the files and reads their headers. If it fails, you see **Could not read the folder.** with the reason. When it passes, click **Next: columns**.
   </Step>
-  <Step title="Map fields">
-    Open the field-mapping editor. Proof pre-seeds default mappings using the CSV column headers from your sample rows. Review each mapping, add overrides, and set transforms such as uppercase or trim.
+  <Step title="Check the columns">
+    Proof matches each field to a column in its file by name, using the defaults below. Check the preview under each file, then click **Next: when it runs**.
   </Step>
-  <Step title="Schedule or run manually">
-    Set a schedule (for example, daily at 02:00) or leave it off and run manual syncs whenever your registrar publishes a new drop.
+  <Step title="Choose when it runs and save">
+    Under **Runs**, pick **Nightly, around 2:00**, **Weekly, around 2:00**, or **Only when someone presses Sync now**. Click **Save and preview**. The first run is a preview and writes nothing until you press **Sync now** or the first scheduled run happens.
   </Step>
 </Steps>
 

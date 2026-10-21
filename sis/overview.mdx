@@ -42,23 +42,23 @@ Consulting firms that work with your institution can view a read-only summary of
 
 ## Connection lifecycle
 
-Setting up an SIS connection on Proof follows five stages: connect, map, test, schedule, and review.
+In the Proof app, the SIS feed lives in **Settings**, on the **Integrations** tab, in the **Student records** section. The app connects an SFTP CSV drop. Vendor API connectors are set up with Proof support.
 
 <Steps>
-  <Step title="Connect">
-    Go to **Settings > Integrations** (or the institution admin panel) and choose your SIS vendor. Provide the vendor credentials, such as an SFTP host or an API token, and select the data modules you want to sync (for example, curriculum and faculty).
+  <Step title="Connect the folder">
+    Click **Connect the registrar’s drop**. Enter the **Server**, **Port**, **Folder**, and **Signs in as** fields, plus a **Password** or a private key. Click **Test the folder**. Proof reads nothing until this test passes.
   </Step>
-  <Step title="Map">
-    Proof shows a guided field-mapping editor with sample rows from your SIS. Match each vendor field, such as `course_number` or `subject`, to the corresponding Proof field. You can override transforms (for example, trim whitespace or uppercase a code) per field.
+  <Step title="Check the columns">
+    Click **Next: columns**. Proof matches each field to a column in its file by name and shows a preview under each file. Check that the preview reads the way your catalog should.
   </Step>
-  <Step title="Test">
-    Run a test sync to validate credentials, field mappings, and row counts. A test sync is recorded as a dry run: it fetches data and previews what would change, but it does not write to your live Proof catalog.
+  <Step title="Choose when it runs">
+    Click **Next: when it runs**. Under **Runs**, pick **Nightly, around 2:00**, **Weekly, around 2:00**, or **Only when someone presses Sync now**.
   </Step>
-  <Step title="Schedule">
-    Enable a recurring schedule so syncs run automatically. You can choose daily, weekly, or hourly cadences and set a preferred time of day. You can also run a one-time manual sync whenever you need it.
+  <Step title="Save and preview">
+    Click **Save and preview**. The first run is a **Preview**: it shows what would be filed and what would wait on you. Nothing is written until you press **Sync now** or the first scheduled run happens.
   </Step>
   <Step title="Review runs">
-    Each sync generates a run report with counts for created, updated, skipped, archived, and errored records. Open any run to inspect per-record outcomes and error messages.
+    The **Runs** list in the section shows each run. Open a run to see what was filed and what failed. Use **Preview**, **Sync now**, and **Pause** or **Resume** at the top of the section.
   </Step>
 </Steps>
 

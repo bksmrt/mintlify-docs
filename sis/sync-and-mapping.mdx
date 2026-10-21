@@ -58,15 +58,15 @@ You can start a sync run in several ways:
 
 | Trigger | How to start | Behavior |
 | --- | --- | --- |
-| Manual | Click **Run sync** on the connection panel | Runs immediately with the full module set |
-| Scheduled | Enable a schedule in the connection settings | Runs automatically at the chosen cadence |
-| Dry run | Choose **Dry run** before starting | Fetches and previews changes without writing to the catalog |
+| Manual | Click **Sync now** in the **Student records** section | Runs immediately with the full module set |
+| Scheduled | Pick a schedule under **Runs** (click **Change**) | Runs automatically at the chosen cadence |
+| Preview | Click **Preview** in the **Student records** section | Fetches and previews changes without writing to the catalog |
 | Test | Run a test connection during setup | Lightweight probe that validates credentials and lists files |
 | Full resync | Enable the full-resync option | Forces a fresh fetch, ignoring the high-water mark |
 
 ## Scheduling options
 
-Recurring syncs are controlled by a per-connection schedule. You can set:
+In the app, the **Runs** setting offers **Nightly, around 2:00**, **Weekly, around 2:00**, or **Only when someone presses Sync now**. The underlying schedule supports:
 
 - **Frequency**: hourly, daily, or weekly
 - **Time of day**: for daily and weekly runs (for example, `02:00`)
