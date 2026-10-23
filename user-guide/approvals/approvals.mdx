@@ -14,7 +14,11 @@ Click **Approvals** in the sidebar. The page is available to institutional admin
 
 ### The queue
 
-The header shows how many submissions are **In the queue**. Each row shows:
+The header shows how many submissions are **In the queue**.
+
+On the left, **Decisions by type** lists the kinds of decision under five types: **Curriculum**, **Students**, **Compliance**, **Faculty**, and **Projects**. Each kind shows how many rows it holds. Each type shows the sum of its kinds, and the column header shows the total. A type with nothing waiting shows **none waiting**. Click a type to fold or unfold it. Proof remembers which types you folded in that browser.
+
+Click a kind to show its rows in the middle. Each row shows:
 
 - **Proposal**: the name of the submission
 - **Standing**: for example **Awaiting decision**, **Changes requested**, **Paused**, **Not routed**, **No one can decide**, **Approved**, **Declined**, **Recalled**, or **Expired**
@@ -29,18 +33,19 @@ Click **Filters** to choose a lane under **Whose move**. Each lane shows a count
 - **Waiting on others**: someone else holds the current step
 - **Settled**: decided, recalled, or expired
 
-When the queue spans more than one area, chips under the filter let you narrow by area.
+When the queue spans more than one area, **Filters** also has an **Area** choice to narrow by area.
 
 ### The record
 
-Click a row to open its record. It has two tabs:
+Click a row to open its record as a card under the row. The front of the card shows what the proposal changes, the current step, the **Approval path**, **Progress so far**, and the decision card if it is your move.
 
-- **Decision**: what the proposal changes, the current step, the **Approval path**, **Progress so far**, and the decision card if it is your move
-- **History**: every step and decision so far
+Click **turn over for its history ↻** to see every step and decision so far on the back. Click **turn back to the decision ↺** to return to the front. Click the row again to close the card.
 
 ## What you can do here
 
-- **Decide**: on the **Decision** tab, approve, request changes, or decline. See [Decide an approval](/user-guide/approvals/how-to/decide-an-approval).
+- **Decide**: on the front of the record card, approve, request changes, or decline. See [Decide an approval](/user-guide/approvals/how-to/decide-an-approval).
+- **Decide several at once**: in the **Your move** lane, some kinds show a selection strip when two or more rows can be decided together. Tick the rows, then click **Approve** or **Decline** and confirm. Decline asks for one reason, which Proof writes onto each row. Each row is still its own decision, with its own history entry and its own notice to whoever filed it. Rows that carry something not in line, such as a drift finding, an exemption, or a rule exception, are held back and decided on their own card.
+- **See the history**: choose **History** from the row menu.
 - **Edit and resubmit**: if you are the author and changes were requested, choose **Edit & resubmit** from the row menu. See [Resubmit after changes are requested](/user-guide/approvals/how-to/resubmit-after-changes).
 - **Edit a draft**: if you are the author of an unsubmitted proposal, choose **Edit draft**.
 - **Open the source**: the row menu links to the source, for example **Open project**, **Open proposal**, **Open section**, or **Open the workspace**.
