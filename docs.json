@@ -71,7 +71,9 @@
           {
             "group": "Get started",
             "pages": [
-              "user-guide/index"
+              "user-guide/index",
+              "user-guide/search",
+              "user-guide/discussions"
             ]
           },
           {
