@@ -25,9 +25,9 @@ Proof routes every decision that one person makes on another's submission throug
 
 A policy is a template made of three tables:
 
-1. `approval_policies` : the policy header, its scope, and inheritance rules
-2. `approval_policy_steps` : the ordered steps of the policy
-3. `approval_step_eligibility_rules` : who may decide at each step
+1. `approval_policies`: the policy header, its scope, and inheritance rules
+2. `approval_policy_steps`: the ordered steps of the policy
+3. `approval_step_eligibility_rules`: who may decide at each step
 
 Policies are scoped by inheritance order: `project_specific` > `engagement` > `project_type` > `institution` > `bksmrt_default`. Firm-scoped policies (`scope = "firm"`) apply across all of that firm's active engagements.
 
