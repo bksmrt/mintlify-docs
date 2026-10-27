@@ -16,6 +16,9 @@ Proof uses multiple LLM providers for extraction, classification, narrative assi
 | `server/modules/ai-routing/reliability.ts` | Circuit breaker, backoff, error classification |
 | `server/modules/ai-routing/embedding-cache.ts` | Embedding deduplication and caching |
 | `server/modules/ai-routing/prompt-safety.ts` | Untrusted-data fencing for prompts |
+| `server/modules/ai-routing/scope.ts` | The college (or public scope) every routed call must name |
+| `server/modules/ai-routing/tenant-providers.ts` | A college's allowed AI providers, read by the router |
+| `server/modules/ai-routing/claude-effort.ts` | Each Claude model's supported and starting effort levels |
 | `server/aiRateLimit.ts` | Per-user rate limiting for interactive AI endpoints |
 | `server/aiUsageRollup.ts` | Nightly rollup of `ai_usage` into `ai_usage_daily` |
 | `server/modules/rag/retriever.ts` | Thin adapter over the hybrid retrieval engine for narrative intelligence |
@@ -33,7 +36,9 @@ Proof supports three providers. A valid key for at least one must be present at 
 | Anthropic | `ANTHROPIC_API_KEY`, or `AI_INTEGRATIONS_ANTHROPIC_API_KEY` |
 | Google (Gemini) | `GEMINI_API_KEY`, or `AI_INTEGRATIONS_GEMINI_API_KEY` |
 
-If both an integration key and a plain key are set, the router falls back from the integration client to the plain key on a 401. Use `GET /api/setup/ai-status` to verify that at least one provider is configured. The endpoint returns booleans only, with no secrets.
+Embeddings run on OpenAI only, so document chunking and retrieval need an OpenAI key even when another provider handles generation. The embedding model defaults to `text-embedding-3-small` (override with `AI_ROUTER_EMBEDDING_MODEL`).
+
+If both an integration key and a plain key are set, the router falls back from the integration client to the plain key on a 401. An integration variable that is set but empty is ignored, so it never hides a plain key. Use `GET /api/setup/ai-status` to verify that at least one provider is configured. The endpoint returns booleans only, with no secrets.
 
 ## Model management and routing
 
@@ -47,6 +52,22 @@ If both an integration key and a plain key are set, the router falls back from t
 
 Concrete defaults are pinned in the registry. Rotating a model is a one-line change in `model-registry.ts`, or a no-code change via environment variable.
 
+### Routing order
+
+Claude is the primary provider. Each task type leads with the Claude tier judged best for it (`CLAUDE_TIER_BY_TASK` in `router.ts`):
+
+- `fast` (Haiku) for light classification, extraction, and reranking
+- `balanced` (Sonnet) for drafting, synthesis, reports, and the advisor chats
+- `frontier` (Opus) for strategic plan extraction and approval policy generation
+
+If that step fails, the chain climbs Claude's tiers (`fast` to `balanced` to `frontier`; `frontier` falls back to `balanced`). The OpenAI and Gemini steps from the task's original chain come last. The router reaches them only when every Claude step fails or no Anthropic key is set. A per-task `AI_ROUTER_*_ANTHROPIC_MODEL` override still becomes the first Claude step.
+
+### Tenant scope and provider lists
+
+Every routed call must name the college or firm whose data it holds, or declare a public scope (`publicAIScope`) when it holds none. The router refuses a call that names neither before any provider is asked.
+
+A college can limit which providers its data may reach. The list lives in `institutional_profiles.ai_providers`: null allows every provider (the default) and an empty list allows none. The router removes disallowed steps before the first call. If no allowed provider is left to answer, the call fails with a `ProviderNotAllowedError`.
+
 ### Resolution precedence
 
 `modelFor(provider, tier, legacyEnvVar?)` resolves a concrete model ID with this precedence:
@@ -58,6 +79,8 @@ Concrete defaults are pinned in the registry. Rotating a model is a one-line cha
 ### Reasoning effort
 
 OpenAI's GPT-5 family defaults to `medium` reasoning effort, which is too slow for large extraction chunks. The router pins `reasoning_effort` to `low` by default. Override with `AI_ROUTER_OPENAI_REASONING_EFFORT` (values: `minimal`, `low`, `medium`, `high`; empty string to omit the field).
+
+Claude calls send an effort level per model, defined in `server/modules/ai-routing/claude-effort.ts`. Tasks that lead with the `fast` tier run at `low`. Every other task asks for its model's starting level.
 
 ### Task types
 

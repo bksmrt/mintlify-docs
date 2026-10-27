@@ -26,6 +26,16 @@ Proof is a single codebase serving many institutions and consulting firms. Every
 
 Every table that holds tenant data carries an `institutionId` column. Queries must filter on it. The tenancy hardening plan (`docs/tenancy-hardening-plan.md`) tracks the migration of every storage getter to accept `institutionId` and enforce `eq(table.institutionId, institutionId)`. Unsafe patterns such as `getProjectById` without an institution filter have been removed or renamed to internal-only helpers.
 
+### Row-level security
+
+Postgres row-level security backs up the storage-layer filters on the six tables that feed AI prompts: `documents`, `document_chunks`, `standards`, `policies`, `narrative_sections`, and `evidence_slots`. A query on these tables that forgets its `institutionId` filter still returns only the request's college. A cross-college update changes nothing, and a cross-college insert is refused.
+
+- **Request scope**: `rowScopeMiddleware` (`server/rowScopeMiddleware.ts`) stores the request's scope in `server/rowScope.ts`: a college for a college member, the engagements a firm member's `firm_users` row reaches, or every college for a platform operator. Background jobs set a college with `withCollege(id, fn)`.
+- **Per transaction**: the `TenantClient` in `server/db.ts` opens every scoped transaction with `SET LOCAL app.scope` and `SET LOCAL ROLE educomply_app`, so the scope never leaks across a pooled connection.
+- **Boot setup**: `server/rowSecurity.ts` creates the `educomply_app` role, the policies' clauses, and the trigger that fills `institution_id` on sections and slots from their project. The policies themselves are declared in `shared/schema.ts`.
+
+During the pilot, a signed-in request with no college set still reads every row. The server logs its path (`[RowScope] ran with no college set`) so the gap can be closed. See `docs/tenant-row-security.md` for the design and its remaining slices.
+
 ### Firm-level isolation
 
 Consulting firms access institutions through active engagements only. `resolveFirmContext` in `server/firmContext.ts` resolves the caller's oldest active firm membership (deterministic tie-breaker by `createdAt`, then `id`) and loads the engagement team memberships for that firm. `getAccessibleInstitutionIds` and `getAccessibleEngagementIds` both filter to `status = "active"` and `acceptanceStatus = "accepted"`. A firm user cannot view data from an archived or pending engagement.
