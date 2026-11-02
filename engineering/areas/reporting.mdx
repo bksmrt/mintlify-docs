@@ -54,7 +54,7 @@ The `GET /api/history` route is the canonical reader. It supports scopes: `insti
 
 For scoped record access, `HISTORY_RECORD_READERS` maps each record type to its storage reader. A course's History, for example, reads `GET /api/history?scope=record&type=course`. The route verifies the record exists in the caller's institution before returning rows.
 
-Readers differ in tenant scoping. `GET /api/my-activity` filters by `user_id` alone, while the trail route forces both `tenant_type` and `institution_id`. An engagement's activity filters by `entity_id` and type.
+Readers differ in tenant scoping. The trail route forces both `tenant_type` and `institution_id`. An engagement's activity filters by `entity_id` and type.
 
 ## Report Studio
 

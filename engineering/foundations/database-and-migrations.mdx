@@ -17,7 +17,7 @@ Proof uses Drizzle ORM with PostgreSQL. Schema changes are applied with `drizzle
 | `docs/schema-migrations.md` | Schema change workflow and CI jobs |
 | `docs/pgvector-migration.md` | Enabling and backfilling pgvector embeddings |
 | `docs/migration-and-db-push.md` | Phase 1 migration notes |
-| `scripts/post-merge-prep.cjs` | Post-merge pgvector extension + index setup |
+| `scripts/post-merge-prep.cjs` | Idempotent schema fixups that `scripts/post-merge.sh` runs after a merge, including the pgvector extension and index |
 | `scripts/unblock-db-push.ts` | Break-glass recovery for enum-recreation blockers |
 
 ## Drizzle and the canonical schema

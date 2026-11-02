@@ -10,7 +10,7 @@ Proof routes every decision that one person makes on another's submission throug
 
 | File | Purpose |
 | --- | --- |
-| `shared/schema.ts` | `approval_policies`, `approval_policy_steps`, `approval_step_eligibility_rules`, `approval_requests`, `approval_request_steps`, `approval_request_decisions`, and related enums |
+| `shared/schema.ts` | `approval_policies`, `approval_policy_steps`, `approval_step_eligibility_rules`, `approval_requests`, `approval_request_steps`, `approval_decisions`, and related enums |
 | `server/approvalResolver.ts` | Pure resolver engine: eligibility expansion, routing modes, override merge, and snapshot flattening |
 | `server/approvalRequests.ts` | Engine runtime: submit, decide, delegate, suspend, recall, and audit-safe transitions |
 | `server/approvals/kinds.ts` | The approval kind registry: every subject kind registers a triage provider |
@@ -57,17 +57,17 @@ Per-project customization writes overrides with `source='project_customize'` bef
 
 ### Phase 5: firm consultant snapshot
 
-The resolver accepts a `ResolverFirmConsultant` snapshot for `firm_user` and `firm_role` eligibility kinds. The caller filters `engagedInstitutionIds` to active engagements before passing it in.
+The resolver accepts a `ResolverFirmUser` snapshot for `firm_user` and `firm_role` eligibility kinds. The caller filters `engagedInstitutionIds` to active engagements before passing it in.
 
 ## Runtime engine
 
 `server/approvalRequests.ts` turns a resolved plan into a live request. It handles:
 
 - `submitApprovalRequest`: creates the request, flattens steps, and notifies deciders
-- `decideApprovalStep`: records a decision, advances the step, and triggers terminal effects
+- `decideApprovalStep`: records a decision (including suspend and send back), advances the step, and triggers terminal effects
 - `withdrawForResubmit`: closes the current cycle as withdrawn and starts a new one
 - `delegateApprovalStep`: reassigns a step to another eligible user
-- `suspendApprovalRequest`: pauses a request
+- `resumeApprovalRequest`: resumes a suspended request
 - `recallApprovalRequest`: allows the submitter to pull the request back
 
 Every engine transition writes an audit row. The `auditSafe` helper is crash-isolated: a failed audit write does not roll back the transition.
