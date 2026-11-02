@@ -31,7 +31,7 @@ The server is organized around an entrypoint, shared infrastructure, domain modu
 | `server/routes.ts` | API route mounting and the `registerRoutes` closure contract |
 | `server/db.ts` | Drizzle client and pool management |
 | `server/static.ts` | Static asset serving (the built client) |
-| `server/storage.ts` | File storage abstraction |
+| `server/storage.ts` | Data access layer: the `IStorage` interface and its `DatabaseStorage` implementation |
 
 ### Domain modules (`server/modules/*`)
 

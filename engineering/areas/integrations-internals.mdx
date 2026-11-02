@@ -50,7 +50,7 @@ Key behaviors:
 
 ### Write-back
 
-Write-back lives in `server/modules/integrations/core/writeback/`. It updates existing SIS rows only, never creates. `enqueueForProject.ts` queues jobs when a committee approves a project, but only when `curriculumOwnership` is `split` and the connection has write-back enabled.
+Write-back lives in `server/modules/integrations/core/writeback/`. It updates existing SIS rows only, never creates. `enqueueForProject.ts` queues jobs when a committee approves a project, but only for connections that have write-back enabled and at least one writable entity.
 
 Outcomes: `applied`, `skipped`, `conflict`, `failed`.
 
