@@ -1,53 +1,74 @@
 ---
-title: "Schedule and complete a review"
-description: "Set a review date for a policy and confirm or flag its linked standards so the Review Calendar stays current."
-sidebarTitle: "Schedule and complete a review"
+title: "Complete a policy review"
+description: "Answer whether a policy still holds, flag the standards it no longer meets, or start a review project."
+sidebarTitle: "Complete a policy review"
 ---
 
-You can schedule a review for any active policy and then record the outcome against its linked compliance standards. Completing a review updates the policy's standing and removes the overdue notice from the **Review Calendar**.
+A policy's review is one question: **Does the policy still hold, as written?** Answering it records the review, starts each linked standard's clock again, and removes the overdue item from the **Review Calendar**.
+
+A review date is earned only by a recorded review. You cannot type one into the policy. Three acts record a review: answering the question, revising the policy's words, and confirming an imported policy's date from its manual.
 
 ## Before you start
 
-- You need the **Compliance Officer**, **Institutional Admin**, or **Department Head** role.
-- The policy should have at least one linked standard so the review is standard driven. A policy with no linked standards can still be reviewed on a periodic schedule.
+- You need a role that can edit policies: institutional admin, compliance officer, department head, or someone an admin has granted policy editing by name. Anyone else sees the question with "An editor of policies answers this."
 
 <Steps>
-  <Step title="Open the policy record">
-    Go to **Policy Inventory** and click the policy you want to review. The policy opens on the **Content** tab of the detail page.
+  <Step title="Open the policy">
+    Go to **Policy Inventory** and click the policy. If the review is due or a linked standard has changed, a **Review is due.** note appears above the tabs. It asks the question in place. You can also open the **Compliance** tab, where the question sits at the head of the policy's words.
   </Step>
-  <Step title="Check the review due notice">
-    If the review date has passed or a linked standard has changed, a **Review is due** notice appears near the top of the page. The notice shows the next review deadline and whether any standard has drifted. Click **Review against standards** in the notice, or open the **Related** tab.
+  <Step title="Read the question">
+    The question names the policy's standards, for example **Does the policy still hold, as written, for all three standards?** The line above it says when the review falls due and who recorded the last one.
   </Step>
-  <Step title="Review each standard">
-    In the **Related** tab, the **Review Currency, by Standard** section lists every linked standard. Each row shows:
+  <Step title="Answer Yes if nothing has changed">
+    Click **Yes**. In **Yes · what you checked**, write what you read and against what, for example "Read the annual notice against 99.7; nothing in it has changed." Click **Send Yes**, then confirm.
 
-    - The standard title
-    - Whether the standard has changed and why
-    - The due date and how long since the last review
-
-    For each standard, choose one action:
-
-    - **Confirm**: the policy still satisfies the standard. This restarts the standard's review clock.
-    - **Flag**: the policy no longer satisfies the standard. This opens a compliance gap and prompts you to describe what fails. Type the reason in the field that appears below the row.
+    Every linked standard is confirmed today under your name, and each one's clock starts again. The words do not change. Your note goes on the policy's **History**.
   </Step>
-  <Step title="Enter the review">
-    After you have chosen **Confirm** or **Flag** for at least one standard, the summary at the bottom of the panel shows how many you confirmed and how many you flagged. Click **Enter review** (the button shows how many decisions you made, for example **Enter review (3)**) to save them. If the policy has no linked standards, click **Mark policy reviewed** instead.
+  <Step title="Answer No if something no longer holds">
+    Click **No**. Each standard appears with two buttons:
+
+    - **Still holds**: the policy still meets this standard.
+    - **Flag**: the policy no longer meets it. Write what it no longer meets, then click **Flag**. A flag opens a compliance gap.
+
+    Click **Enter review** to send your answers, or **Back to the question** to return with nothing sent.
+
+    In the **Review is due.** note, **No** opens the **Compliance** tab on the standards.
   </Step>
   <Step title="Verify the result">
-    A toast message appears confirming how many standards were confirmed, flagged, and whether any gaps were opened. The **Review Calendar** refreshes automatically, and the policy's next review date updates based on the earliest linked standard deadline.
+    A message confirms the review, for example "Review recorded, no change". The byline's **Reviewed** shows the day, your name, and how the review was recorded. The **Review Calendar** refreshes.
   </Step>
 </Steps>
 
+<Note>
+If the policy has no linked standards, **No** means its words need to change. Revise them on the **Content** tab: the revision is its review. See [Update a policy](/user-guide/compliance/how-to/update-a-policy).
+</Note>
+
+## Start a review project
+
+When a policy needs real work rather than a yes or no, start a compliance project to bring it up to date. Institutional admins and compliance officers can do this.
+
+<Steps>
+  <Step title="Open the dialog">
+    In the policy's **Review is due.** note, click **Start a review project**.
+  </Step>
+  <Step title="Check the proposal">
+    The dialog shows the project it creates: **Review:** and the policy title, you as lead, a due date 30 days out, and the policy linked on the project's **Related** tab. Add an optional reason in **Why it needs review**. If your college asks new work to name a strategic objective, choose one.
+  </Step>
+  <Step title="Read the approval route">
+    **Approval route** says who decides the proposal and how quickly. The policy's owner is asked first, if it has one.
+  </Step>
+  <Step title="Submit">
+    Click **Submit for approval**. The dialog says who it is waiting on, with **Open in Approvals**. If your college's route asks no one, the review starts at once, with **Open the project**.
+  </Step>
+</Steps>
+
+While the project is open, the Decay view in [Regulatory Intelligence](/user-guide/compliance/regulatory-intelligence) shows **Under review** beside the stale policy, with the project's name.
+
 ## What happens next
 
-- The policy's **Review due** date advances to the next cycle.
 - Confirmed standards show a new **Current through** date.
 - Flagged standards open compliance gaps that you work from the [compliance workspace](/user-guide/accreditation/compliance-workspace).
-- The **History** tab of the policy records the review entry with a timestamp.
-
-<Tip>
-  You can also reach the **Review Calendar** from the sidebar or from the mini calendar on the **Policy Inventory** page. Click any dot on a date to see what is due that day.
-</Tip>
+- The policy's **History** records the review with your name and, for a Yes, what you checked.
 
 ## Related
 

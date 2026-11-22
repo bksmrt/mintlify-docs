@@ -102,6 +102,9 @@
               "user-guide/compliance/regulatory-intelligence",
               "user-guide/compliance/policy-inventory",
               "user-guide/compliance/review-calendar",
+              "user-guide/compliance/manage-compliance",
+              "user-guide/compliance/exceptions",
+              "user-guide/compliance/compliance-calendar",
               {
                 "group": "How to",
                 "pages": [
@@ -150,14 +153,26 @@
             "group": "Reports and audit",
             "pages": [
               "user-guide/reports/report-studio",
+              "user-guide/reports/delivered-reports",
               "user-guide/reports/audit-trail",
               {
                 "group": "How to",
                 "pages": [
+                  "user-guide/reports/how-to/build-a-custom-report",
                   "user-guide/reports/how-to/share-and-schedule-a-report",
                   "user-guide/reports/how-to/check-who-changed-a-record"
                 ]
               }
+            ]
+          },
+          {
+            "group": "Institution",
+            "pages": [
+              "user-guide/institution/ethos",
+              "user-guide/institution/ethos-exceptions",
+              "user-guide/institution/strategic-plan",
+              "user-guide/institution/scores",
+              "user-guide/institution/assistants"
             ]
           }
         ]
