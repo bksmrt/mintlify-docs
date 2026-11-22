@@ -4,7 +4,7 @@ description: "How Proof delivers webhooks: success criteria, retry schedule, aut
 sidebarTitle: "Delivery"
 ---
 
-Proof delivers webhooks through a background worker that sweeps pending deliveries and POSTs them to your endpoints. Understanding the success criteria, retry logic, and failure handling helps you build reliable receivers and debug delivery issues.
+Proof delivers webhooks through a background worker that sweeps pending deliveries about once a minute, up to 50 per sweep, and POSTs them to your endpoints. Understanding the success criteria, retry logic, and failure handling helps you build reliable receivers and debug delivery issues.
 
 ## Success criteria
 
@@ -20,13 +20,13 @@ Proof retries failed deliveries with exponential backoff. The delay between atte
 
 | Attempt | Delay after previous failure |
 | --- | --- |
-| 1st attempt | Sent when the event occurs |
+| 1st attempt | The next sweep after the event, usually within a minute |
 | 2nd attempt | 5 minutes |
 | 3rd attempt | 30 minutes |
 | 4th attempt | 2 hours |
 | 5th attempt | 12 hours |
 
-If the 5th attempt fails, the delivery is marked as failed and no further attempts are made.
+If the 5th attempt fails, the delivery is marked `failed` and no further attempts are made. Each attempt is signed afresh, so its `t=` timestamp is the time of that attempt.
 
 <Note>
   The retry schedule is the same shape used by the email retry queue. Delays are applied from the moment the previous attempt fails, not from the original event time.
@@ -34,18 +34,20 @@ If the 5th attempt fails, the delivery is marked as failed and no further attemp
 
 ## Auto-disable
 
-If an endpoint accumulates **20 consecutive failed delivery attempts**, Proof automatically disables it. The UI shows the disabled reason: "Auto-disabled after 20 consecutive delivery failures". Any successful delivery resets the count to zero.
+If an endpoint accumulates **20 consecutive failed delivery attempts**, Proof automatically disables it. The endpoint card shows the reason: "Auto-disabled after 20 consecutive delivery failures". Any successful delivery resets the count to zero.
 
-When you re-enable an endpoint from the webhooks UI, the failure streak resets to zero and deliveries resume normally.
+While an endpoint is disabled, by Proof or by you with its toggle, pending deliveries to it are marked `failed` with "Endpoint disabled or deleted" when the worker reaches them, and new events are not queued for it. Re-enabling does not replay them. When you re-enable an endpoint, the failure streak resets to zero and new events are delivered again.
+
+Deleting an endpoint deletes its delivery history too.
 
 ## Idempotency
 
 You can safely process the same event more than once without side effects:
 
-- **`X-Booksmart-Delivery`**: Each POST attempt carries a unique delivery ID. If Proof retries, each attempt gets a different delivery ID.
-- **`eventId`**: The envelope contains an `eventId` that is the same across all retry attempts for the same event occurrence.
+- **`X-Booksmart-Delivery`**: Identifies one delivery of one event to one endpoint. Every retry of that delivery carries the same value.
+- **`eventId`**: Identifies the event itself. It is the same across retries, and the same for every endpoint that receives the event.
 
-Best practice: store seen `eventId` values in a short-lived cache and skip processing for duplicates.
+Best practice: store seen `eventId` values (or delivery IDs, if one receiver serves several endpoints) and skip processing for duplicates. A retry can arrive after your endpoint already processed the event, for example when your 2xx response took longer than 10 seconds.
 
 ## Ordering guarantee
 
@@ -62,13 +64,12 @@ Supported protocols are `http:` and `https:`. Redirects are limited to 5 hops.
 
 ## Delivery log in the UI
 
-On an endpoint row, click **Show recent deliveries** to see its last **50 deliveries**, including:
+On an endpoint card in **Settings › Webhooks**, click **Show recent deliveries** to see its last **50 deliveries**. Each row shows:
 
-- Event type and timestamp
 - Delivery status (`pending`, `succeeded`, or `failed`)
-- Number of attempts and the maximum allowed
-- HTTP response status from your endpoint (if any)
-- Last error message (if any)
+- Event type
+- The HTTP response status from your endpoint, or the last error message if there was no response
+- Attempts made out of the maximum (for example, `2/5`)
 
 Use this log to diagnose why an endpoint is failing before it hits the auto-disable threshold.
 

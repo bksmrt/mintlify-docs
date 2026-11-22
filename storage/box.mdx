@@ -7,14 +7,14 @@ Connect a Box account to browse your Box folders and import documents into a pro
 
 ## Before you start
 
-- Your Proof administrator must have configured the Box OAuth client. If not, Box shows as unavailable in the connect list.
-- Any member of your institution can connect an account from the **Import from cloud** dialog in a project's evidence tab.
+- Your Proof operator must have configured the Box OAuth client. Until then, **Settings › Integrations** reads **Not configured by your administrator yet.** for Box, and connecting fails with `provider_not_configured`.
+- Any member of your institution can connect an account from the **Import from cloud** dialog in a project's evidence tab. An institutional admin can also connect one in **Settings › Integrations › Storage**.
 
 ## Connect and import
 
 <Steps>
   <Step title="Open the import dialog">
-    In a project's evidence tab, click **Import from cloud**, then choose **Box**.
+    In a project's evidence tab, click **Import from cloud**, then click **Connect** next to **Box**.
   </Step>
   <Step title="Approve access">
     Sign in to Box and grant Proof access. The connection shows your Box login email once it is ready.

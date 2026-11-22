@@ -4,7 +4,7 @@ description: "Reference for every event type Proof can deliver, including the en
 sidebarTitle: "Events"
 ---
 
-Each webhook delivery contains a JSON envelope with standard metadata and an event-specific `data` object. This page documents the envelope schema, the available event types, and example payloads extracted from the Proof codebase.
+Each webhook delivery contains a JSON envelope with standard metadata and an event-specific `data` object. This page documents the envelope schema, the available event types, and example payloads.
 
 ## Envelope schema
 
@@ -20,26 +20,50 @@ Every POST body follows this shape:
 
 ## Available event types
 
+These are the event types you can pick when you add an endpoint:
+
 | Event type | Fires when |
 | --- | --- |
-| `sync.run.finished` | An SIS sync run completes, regardless of outcome |
-| `sync.run.failed` | An SIS sync run finishes with a failure status |
-| `compliance.gap.resolved` | A compliance gap is resolved because evidence was substantiated |
-| `project.status.changed` | A project status changes (defined in the event registry) |
-| `billing.checkout_completed` | A Stripe checkout session completes for the institution |
-| `billing.read_only_entered` | The institution enters a billing read-only state |
-| `ping` | Manually queued with the send (test) button on an endpoint row |
-| `*` | Wildcard: subscribe to every event type listed above |
+| `sync.run.finished` | An SIS sync run ends with status `completed` or `partial` |
+| `sync.run.failed` | An SIS sync run ends with status `failed` |
+| `compliance.gap.resolved` | A compliance gap resolves, whichever path closed it (see `trigger` below) |
+| `project.status.changed` | Listed for subscription, but not emitted today |
+| `billing.checkout_completed` | A Stripe checkout completes for the institution |
+| `billing.read_only_entered` | The institution's subscription enters read-only because billing is past due |
+| `*` | Wildcard: every event type, including the other billing events below |
+
+You never subscribe to `ping`. Proof sends it to one endpoint when you click the test button on that endpoint, whatever event types the endpoint lists.
 
 <Note>
-  `project.status.changed` is registered in the webhook event types list, but it is not currently emitted anywhere in the runtime codebase. If you subscribe to it, you will not receive deliveries today.
+  `project.status.changed` is accepted when you add an endpoint, but nothing in Proof emits it today. If you subscribe to it alone, you receive no deliveries.
 </Note>
+
+### Billing events delivered to wildcard subscribers
+
+Proof emits a `billing.<kind>` event for every billing notification on an institution's subscription. Only `billing.checkout_completed` and `billing.read_only_entered` can be picked by name. An endpoint subscribed to `*` also receives these:
+
+| Event type | Fires when |
+| --- | --- |
+| `billing.payment_failed` | A payment fails |
+| `billing.grace_entered` | The subscription enters its grace period |
+| `billing.grace_reminder` | A reminder during the grace period (`data.graceEndsAt`, `data.daysLeft`) |
+| `billing.reactivated` | The subscription is active again |
+| `billing.subscription_cancelled` | The subscription is cancelled |
+| `billing.plan_changed`, `billing.upgrade_applied`, `billing.downgrade_scheduled`, `billing.downgrade_blocked` | The plan changes, or a change is scheduled or blocked |
+| `billing.module_added` | A module is added (`data.moduleCode`) |
+| `billing.module_trial_granted`, `billing.module_trial_ending`, `billing.module_trial_expired` | A promotional module term starts, nears its end, or ends |
+| `billing.trial_ending_soon` | The trial is about to end |
+| `billing.upcoming_invoice`, `billing.overage_invoiced`, `billing.renewal_upcoming`, `billing.credit_issued` | Invoice, renewal and credit notices |
+| `billing.po_invoice_sent`, `billing.po_invoice_paid`, `billing.po_invoice_voided`, `billing.po_invoice_overdue` | A purchase-order invoice is sent, paid, voided, or overdue |
+| `billing.price_lock_expiring` | A multi-year price lock is approaching its end |
+
+Every billing event's `data` holds `subscriptionId` and `kind`, plus the metadata of that notice. Billing for a consulting firm's own subscription never produces a webhook.
 
 ## Event payloads
 
 ### `sync.run.finished` and `sync.run.failed`
 
-Fired at the end of every SIS sync run in the integration engine.
+Fired at the end of every SIS sync run, including preview runs. A run that ends `completed` or `partial` sends `sync.run.finished`; a run that ends `failed` sends `sync.run.failed`.
 
 ```json
 {
@@ -50,9 +74,9 @@ Fired at the end of every SIS sync run in the integration engine.
   "data": {
     "runId": "run_98765432-1234-1234-1234-123456789def",
     "connectionId": "conn_11111111-2222-3333-4444-555555555555",
-    "vendorId": "acme_sis",
-    "modules": ["terms", "departments", "courses"],
-    "finalStatus": "finished",
+    "vendorId": "sftp_csv",
+    "modules": ["curriculum", "faculty"],
+    "finalStatus": "completed",
     "isDryRun": false
   }
 }
@@ -64,14 +88,14 @@ Fields:
 | --- | --- |
 | `runId` | The sync run identifier |
 | `connectionId` | The SIS connection that ran |
-| `vendorId` | The vendor identifier (for example, `acme_sis`) |
-| `modules` | Array of module names synced in this run |
-| `finalStatus` | `"finished"` or `"failed"` |
-| `isDryRun` | `true` if this was a preview run |
+| `vendorId` | The vendor identifier (for example, `sftp_csv` for the CSV feed) |
+| `modules` | The modules synced in this run: `curriculum`, `faculty`, or both |
+| `finalStatus` | `"completed"`, `"partial"` (some modules failed), or `"failed"` |
+| `isDryRun` | `true` if this was a preview run, which writes nothing |
 
 ### `compliance.gap.resolved`
 
-Fired when a compliance gap closes because linked evidence was substantiated.
+Fired when a compliance gap resolves. The `trigger` field says what closed it.
 
 ```json
 {
@@ -95,11 +119,13 @@ Fields:
 | `gapId` | The resolved gap identifier |
 | `projectId` | The project the gap belongs to (may be `null`) |
 | `standardId` | The standard the gap relates to (may be `null`) |
-| `trigger` | The reason the gap resolved (for example, `"evidence_substantiated"`) |
+| `trigger` | What closed the gap: `"evidence_substantiated"` (its required evidence was shown), `"findings_resolved"` (its last open finding was resolved), or `"cause_resolved"` (someone answered Yes to the gap's cause question) |
+
+A gap that reopens sends no event.
 
 ### `billing.checkout_completed`
 
-Fired when a Stripe checkout session completes for an institution tenant.
+Fired when a Stripe checkout session completes for an institution tenant. It also fires when the checkout is received but payment has not cleared yet; access activates once it does.
 
 ```json
 {
@@ -111,7 +137,6 @@ Fired when a Stripe checkout session completes for an institution tenant.
     "subscriptionId": "sub_55555555-6666-7777-8888-999999999999",
     "kind": "checkout_completed",
     "stripeSubscriptionId": "sub_stripe_abc123",
-    "stripeCustomerId": "cus_stripe_def456",
     "planCode": "standard",
     "bandCode": "medium",
     "cadence": "annual"
@@ -126,14 +151,15 @@ Fields:
 | `subscriptionId` | The Proof subscription identifier |
 | `kind` | The billing event kind |
 | `stripeSubscriptionId` | The Stripe subscription identifier |
-| `stripeCustomerId` | The Stripe customer identifier |
 | `planCode` | The purchased plan code |
 | `bandCode` | The tenant size band |
 | `cadence` | The billing cadence (for example, `"annual"`, `"monthly"`) |
 
+`planCode`, `bandCode`, and `cadence` can be `null` when the checkout did not carry them.
+
 ### `billing.read_only_entered`
 
-Fired when an institution's subscription enters a read-only state due to past-due billing.
+Fired when an institution's subscription enters read-only because billing has been past due for more than 14 days. Write actions are disabled until the outstanding invoice is paid. `data.graceEndsAt` is when the grace period ended.
 
 ```json
 {
@@ -151,7 +177,7 @@ Fired when an institution's subscription enters a read-only state due to past-du
 
 ### `ping`
 
-Queued manually with the send (test) button on an endpoint row in the webhooks UI.
+Queued for one endpoint when you click its send (test) button in **Settings › Webhooks**.
 
 ```json
 {
@@ -167,7 +193,7 @@ Queued manually with the send (test) button on an endpoint row in the webhooks U
 
 ## Wildcard subscription
 
-If you subscribe to `*`, your endpoint receives every event type including future additions. This is useful for logging or audit pipelines. If you need to filter after receipt, inspect the `X-Booksmart-Event` header or the `eventType` field in the body.
+If you subscribe to `*`, your endpoint receives every event type, including every `billing.<kind>` event and any type added later. This is useful for logging or audit pipelines, but your receiver should ignore event types it does not recognize. If you need to filter after receipt, inspect the `X-Booksmart-Event` header or the `eventType` field in the body.
 
 ## Next steps
 

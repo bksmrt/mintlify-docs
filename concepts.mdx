@@ -11,7 +11,7 @@ Each institution is an isolated tenant. When you connect an integration, you do 
 
 ## Consulting firms and engagements
 
-Consulting firms use Proof to manage accreditation work on behalf of institutions. A firm creates an engagement with an institution, then builds projects, assigns consultants, and collects evidence within that engagement. Integrations such as cloud storage and SIS sync can be configured at the institution level, but imported data can be scoped to a specific engagement when appropriate.
+Consulting firms use Proof to manage accreditation work on behalf of institutions. A firm creates an engagement with an institution, then builds projects, assigns consultants, and collects evidence within that engagement. Integrations are configured at the institution level. A firm sees the SIS feeds of the institutions it is engaged with, read-only, and cannot change them. Files imported from cloud storage into an engagement's project are scoped to that engagement.
 
 ## User roles
 
@@ -27,7 +27,9 @@ Proof assigns every user a primary role and a set of additional roles. The role 
 | `advisor` | Student exception requests and audit history |
 | `dean`, `provost`, `president`, `board` | Strategic initiative approvers |
 
-For integration configuration, `institutional_admin` is the gating role. SSO and webhook setup require it, and only an `institutional_admin` can disconnect a cloud storage account or create an SSO connection.
+For integration configuration, `institutional_admin` is the gating role. Webhooks and the SIS feed require it (a `compliance_officer` can be granted SIS management by name), and an `institutional_admin` can disconnect a cloud storage account. SSO roles are covered in [SSO roles and sessions](/sso/roles-and-sessions).
+
+An account belongs to one institution. Single sign-on never adds an account that already belongs to another institution.
 
 ## Proof is not an SIS
 
@@ -35,7 +37,7 @@ Proof is a compliance system, not a student information system. It does not main
 
 ## Provenance and data handling
 
-- **SIS provenance**: records created or updated from an SIS sync carry a provenance marker (for example, the courses index shows "from SIS"). This helps teams distinguish institution-owned data from data that originated in an external system.
+- **SIS provenance**: records created or updated from an SIS sync carry a provenance marker naming the feed they came from (for example, **Registrar nightly drop**), and a record the feed no longer sends reads **Archived from SIS**. Records entered by hand read **Manual entry**. This helps teams distinguish institution-owned data from data that originated in an external system.
 - **Credential encryption**: OAuth tokens and SFTP credentials for integrations are encrypted at rest. The platform decrypts them only when needed to make an outbound API call or refresh a token. Decrypted credentials are never returned in API responses.
-- **Webhook payloads**: outgoing webhook events contain references (IDs, event types, timestamps) rather than full document or record bodies. Your consumer can use those identifiers to fetch details through the authenticated web app if needed.
+- **Webhook payloads**: outgoing webhook events contain references (IDs, event types, timestamps, statuses) rather than full document or record bodies. Your consumer can use those identifiers to look up details in the authenticated web app.
 - **Disconnect behavior**: when you disconnect a cloud storage provider, Proof wipes the encrypted credentials but preserves the `storage_imports` provenance records. You do not lose the history of what was imported, but the connection can no longer browse or download files.

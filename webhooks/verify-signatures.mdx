@@ -15,7 +15,9 @@ X-Booksmart-Signature: t=<unix_timestamp>,v1=<hex_hmac>
 ```
 
 - `t`: Unix timestamp (seconds since epoch) when the signature was generated
-- `v1`: HMAC-SHA256 of the string `"<t>.<raw_body>"` using your endpoint's signing secret
+- `v1`: HMAC-SHA256 of the string `"<t>.<raw_body>"`, hex-encoded, keyed with your endpoint's signing secret
+
+Use the whole secret as the key, including its `whsec_` prefix. Proof signs each attempt when it sends it, so a retry carries a new `t` and a new `v1`.
 
 ## Algorithm
 

@@ -8,69 +8,72 @@ Proof connects to your institution's Student Information System (SIS) to pull cu
 
 ## What syncs and what does not
 
-Proof pulls select data sets from an SIS and stamps each record with provenance so you always know which rows came from an external source. Records created or updated from a sync show a provenance marker (for example, the courses index shows "from SIS").
+Proof pulls select data sets from an SIS and stamps each record with provenance so you always know which rows came from an external source. A synced record carries a tag naming its feed, and a record the feed no longer sends reads **Archived from SIS**.
 
 | Direction | Data that syncs | Data that does not sync |
 | --- | --- | --- |
 | Into Proof | Courses, departments, academic programs, terms, faculty | Students, grades, enrollments, registration, sections, schedules |
-| Back to SIS (optional) | Approved changes to courses, programs, departments, prerequisites, requirement groups | Any new SIS records (writeback updates only) |
+| Back to SIS | Nothing from the CSV feed. See [Writeback](/sis/writeback). | |
 
-## Supported vendors
+## Supported feeds
 
-Proof supports direct connections to several SIS vendors. Each vendor has a status that indicates whether it is fully available, available in beta, or planned for a future release.
+A college can connect one kind of feed today: the **SFTP / CSV Drop**, where your registrar's system writes CSV files to an SFTP folder and Proof reads them. It works with any SIS that can export CSV.
 
-| Vendor | Status | Authentication | Data modules |
-| --- | --- | --- | --- |
-| SFTP / CSV Drop | Active | SFTP (host, username, password, or key) | Curriculum, faculty |
-| Ellucian Banner | Beta | API token or OAuth2 | Curriculum, institutional profile, evidence, faculty |
-| Ellucian Colleague | Beta | API token | Curriculum, institutional profile, faculty |
-| Workday Student | Beta | OAuth2 | Curriculum, institutional profile, faculty |
-| Oracle PeopleSoft Campus Solutions | Coming soon | API token | Curriculum, institutional profile, faculty |
-| Jenzabar One | Coming soon | API token | Curriculum, institutional profile, faculty |
+| Vendor | Status | Can a college connect it? |
+| --- | --- | --- |
+| SFTP / CSV Drop | Active | Yes, in **Settings › Integrations** |
+| Ellucian Banner | Beta | Not yet |
+| Ellucian Colleague | Beta | Not yet |
+| Workday Student | Beta | Not yet |
+| Oracle PeopleSoft Campus Solutions | Coming soon | No |
+| Jenzabar One | Coming soon | No |
 
-Vendors marked **beta** are implemented against documented vendor APIs but have not yet been validated end to end against a live sandbox. Vendors marked **coming soon** are registered as placeholders and cannot yet run syncs.
+The beta vendors have API connectors in Proof that have not been run end to end against a vendor sandbox, so they are not offered to colleges. See [Vendor connectors](/sis/vendor-connectors).
 
-## Who can configure an SIS connection
+## Who can configure an SIS feed
 
-Configuring an SIS integration is limited to people with the appropriate role at your institution.
+- **Institutional admins** can connect, change, pause, sync, and disconnect the feed.
+- **Compliance officers** can see the feed and its runs. An institutional admin can grant a compliance officer SIS management by name on the **Users** page; with the grant, they can manage the feed too. Without it, the section says "An admin can grant you SIS management on the Users page."
+- **Other roles** (faculty, department heads, auditors, students) do not see the **Student records** section.
 
-- **Institutional admins** can create, edit, disconnect, and delete connections.
-- **Compliance officers** can view connection status and run reports. An institutional admin can also grant a compliance officer explicit permission to manage SIS connections by name.
-- **Other roles** (faculty, department heads, auditors, students) cannot access the integration screens.
-
-Consulting firms that work with your institution can view a read-only summary of connections from the engagement page, but they cannot create or modify them.
+Consulting firms engaged with your institution see a read-only summary of its feeds from the engagement page. They cannot create or change them. Proof operators can read your feed but cannot change it.
 
 ## Connection lifecycle
 
-In the Proof app, the SIS feed lives in **Settings**, on the **Integrations** tab, in the **Student records** section. The app connects an SFTP CSV drop. Vendor API connectors are set up with Proof support.
+In the Proof app, the SIS feed lives in **Settings › Integrations**, in the **Student records** section. A college has one primary feed.
 
 <Steps>
   <Step title="Connect the folder">
-    Click **Connect the registrar’s drop**. Enter the **Server**, **Port**, **Folder**, and **Signs in as** fields, plus a **Password** or a private key. Click **Test the folder**. Proof reads nothing until this test passes.
+    Click **Connect the registrar’s drop**. Under **Where the files are**, enter the **Server**, **Port**, **Folder**, and **Signs in as** fields, plus a **Password** or **Or a private key**. Click **Test the folder**. Proof reads nothing until this test passes.
+  </Step>
+  <Step title="Choose what comes in">
+    The test lists the files it found. Tick the ones to bring in. Faculty is off until you turn it on.
   </Step>
   <Step title="Check the columns">
     Click **Next: columns**. Proof matches each field to a column in its file by name and shows a preview under each file. Check that the preview reads the way your catalog should.
   </Step>
   <Step title="Choose when it runs">
-    Click **Next: when it runs**. Under **Runs**, pick **Nightly, around 2:00**, **Weekly, around 2:00**, or **Only when someone presses Sync now**.
+    Click **Next: when it runs**. Under **Runs**, pick **Nightly, around 2:00**, **Weekly, around 2:00**, or **Only when someone presses Sync now**. Give the feed a **Name**.
   </Step>
   <Step title="Save and preview">
     Click **Save and preview**. The first run is a **Preview**: it shows what would be filed and what would wait on you. Nothing is written until you press **Sync now** or the first scheduled run happens.
   </Step>
   <Step title="Review runs">
-    The **Runs** list in the section shows each run. Open a run to see what was filed and what failed. Use **Preview**, **Sync now**, and **Pause** or **Resume** at the top of the section.
+    The **Runs** list shows the last 10 runs. Open a run to see what was filed and what waits on you. Use **Preview**, **Sync now**, and **Pause** or **Resume** at the top of the section.
   </Step>
 </Steps>
+
+If the feed cannot sign in to the folder, its stamp reads **Failing** and the section offers **Update the SFTP password**. Once the new password signs in, the feed is live again. **Disconnect** removes the feed.
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card title="SFTP / CSV Drop" href="/sis/sftp-csv">
-    Set up a nightly CSV file drop over SFTP. This is the only fully active SIS path today and works with any SIS that can export CSV files.
+    Set up a nightly CSV file drop over SFTP. This is the feed a college can connect today, and it works with any SIS that can export CSV files.
   </Card>
 
   <Card title="Vendor connectors" href="/sis/vendor-connectors">
-    Learn the credentials and configuration steps for Ellucian Banner, Colleague, Workday, and other vendor APIs.
+    The status of the Ellucian Banner, Colleague, Workday, PeopleSoft, and Jenzabar connectors.
   </Card>
 
   <Card title="Sync and field mapping" href="/sis/sync-and-mapping">
@@ -78,6 +81,6 @@ In the Proof app, the SIS feed lives in **Settings**, on the **Integrations** ta
   </Card>
 
   <Card title="Writeback" href="/sis/writeback">
-    Send approved catalog changes back to your SIS. Covers prerequisites, requirements, and course updates.
+    How approved catalog changes can flow back to an SIS, and why the CSV feed does not.
   </Card>
 </CardGroup>

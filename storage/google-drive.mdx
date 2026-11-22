@@ -7,8 +7,8 @@ Connect a Google Drive account to browse your Drive and import compliance docume
 
 ## Before you start
 
-- Your Proof administrator must have configured the Google Drive OAuth client. If not, Google Drive shows as unavailable in the connect list.
-- Any member of your institution can connect an account from the **Import from cloud** dialog in a project's evidence tab.
+- Your Proof operator must have configured the Google Drive OAuth client. Until then, **Settings › Integrations** reads **Not configured by your administrator yet.** for Google Drive, and connecting fails with `provider_not_configured`.
+- Any member of your institution can connect an account from the **Import from cloud** dialog in a project's evidence tab. An institutional admin can also connect one in **Settings › Integrations › Storage**.
 
 ## Permissions Proof requests
 
@@ -25,7 +25,7 @@ Proof requests offline access, so the connection keeps working after your sessio
 
 <Steps>
   <Step title="Open the import dialog">
-    In a project's evidence tab, click **Import from cloud**, then choose **Google Drive**.
+    In a project's evidence tab, click **Import from cloud**, then click **Connect** next to **Google Drive**.
   </Step>
   <Step title="Approve access">
     Sign in to Google and approve the requested permissions. Google always shows the consent screen, even if you approved Proof before.
