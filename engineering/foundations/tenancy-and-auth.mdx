@@ -19,6 +19,9 @@ Proof is a single codebase serving many institutions and consulting firms. Every
 | `client/src/components/app-sidebar.tsx` | `SIDEBAR_ROLE_MATRIX`, which decides what nav items each role sees |
 | `docs/bksmrt-write-policy.md` | Full classification of the three-bucket write guard system |
 | `docs/tenancy-hardening-plan.md` | Checklist of storage-layer `institutionId` scoping and active-engagement gating |
+| `server/rowScope.ts`, `server/rowScopeMiddleware.ts`, `server/rowSecurity.ts` | Row-level security: request scope, middleware, role and policy setup |
+| `server/engagementDocuments.ts` | Which documents a firm member may read |
+| `docs/tenant-row-security.md`, `docs/ai-tenant-isolation.md` | Row-level security design; what each model call can see |
 
 ## Multi-tenancy model
 
@@ -35,6 +38,16 @@ Postgres row-level security backs up the storage-layer filters on the six tables
 - **Boot setup**: `server/rowSecurity.ts` creates the `educomply_app` role, the policies' clauses, and the trigger that fills `institution_id` on sections and slots from their project. The policies themselves are declared in `shared/schema.ts`.
 
 During the pilot, a signed-in request with no college set still reads every row. The server logs its path (`[RowScope] ran with no college set`) so the gap can be closed. See `docs/tenant-row-security.md` for the design and its remaining slices.
+
+### AI tenant isolation
+
+A model call is stateless, so a college's data is isolated exactly as far as the code that builds each prompt reads only that college's rows. Three server rules hold this:
+
+- **Every routed call names its scope.** `RouteRequest.tenantId` is an `AIScope` (`server/modules/ai-routing/scope.ts`): a college's or firm's id, or `publicAIScope("why")` for a call that holds no college's data. Leaving it out fails the type check, and the router refuses it again at run time.
+- **Prompt sources are checked.** The router refuses a prompt that carries an excerpt from another college's rows.
+- **A college can limit its providers.** `institutional_profiles.ai_providers` lists the providers its data may reach; the router drops the rest.
+
+Documents a consulting firm keeps on an engagement are read through one reader (`server/engagementDocuments.ts`): a firm member reads the college's library and her own engagement's files, never another firm's. See `docs/ai-tenant-isolation.md`.
 
 ### Firm-level isolation
 
@@ -143,4 +156,5 @@ Platform operators may use view-as functionality to troubleshoot on behalf of us
 - [Authentication and SSO for integrations](/sso/overview)
 - [Database and migrations](/engineering/foundations/database-and-migrations)
 - [Approvals framework](/engineering/foundations/approvals-framework)
+- [Billing and modules](/engineering/foundations/billing-and-modules)
 - [Local development](/engineering/local-development)

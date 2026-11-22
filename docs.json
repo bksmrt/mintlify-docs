@@ -194,7 +194,9 @@
               "engineering/foundations/tenancy-and-auth",
               "engineering/foundations/database-and-migrations",
               "engineering/foundations/approvals-framework",
-              "engineering/foundations/ai-services"
+              "engineering/foundations/ai-services",
+              "engineering/foundations/score-family",
+              "engineering/foundations/billing-and-modules"
             ]
           },
           {
@@ -207,7 +209,8 @@
               "engineering/areas/ethos",
               "engineering/areas/suggestions-cockpits",
               "engineering/areas/integrations-internals",
-              "engineering/areas/reporting"
+              "engineering/areas/reporting",
+              "engineering/areas/catalog-pipeline"
             ]
           },
           {

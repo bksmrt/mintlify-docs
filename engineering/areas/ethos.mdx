@@ -11,16 +11,50 @@ Ethos is Proof's posture system that lets an institution declare its governance 
 | Concern | File or module |
 | --- | --- |
 | Ethos defaults (spec registry) | `server/ethos/defaults.ts` |
-| Ethos presets (delta maps) | `server/ethos/presets.ts` |
+| Ethos presets (delta maps) | `server/ethos/presets.ts`, reading `shared/ethos-presets.ts` |
+| The settings table | `shared/ethos-knobs.ts` (`ETHOS_KNOBS`), held by `server/ethos/__tests__/ea1-knob-census.test.ts` |
+| Posture ICI weights | `shared/ethos-ici.ts` |
+| College adjustments | `shared/ethos-adjustments.ts`, `PUT /api/institution/ethos/adjustments` |
+| Settings read (page and assistant) | `server/ethos/settingsRead.ts`, `server/ethos/settingsView.ts` |
+| Who may ask for exceptions | `shared/ethos-exceptions.ts`, `server/ethos/exceptionsAllowed.ts` |
+| Department exceptions | `server/modules/ethos-department-exceptions/*`, `shared/ethos-academic-year.ts` |
+| Project exceptions | `server/modules/ethos-project-exceptions/*` |
+| Project governance default | `server/projectGovernanceDefault.ts` |
+| Recommendation and inputs | `server/ethos/recommender.ts`, `server/ethos/inputs.ts`, `shared/ethos-inputs.ts` |
+| Ethos assistant | `server/ethos/assistant.ts`, `shared/ethos-assistant.ts`, `shared/ethos-steps.ts` |
+| Pages | `client/src/pages/ethos.tsx` (`/ethos`), `client/src/pages/ethos-configuration.tsx` (`/ethos/configuration`) |
 | Typed consumers | `server/ethos/consumers.ts` |
 | Resolver (effective tuning) | `server/ethos/resolver.ts` |
 | Effective-ethos loader | `server/modules/ethos/effective-ethos.ts` |
 | Ethos routes (save, read) | `server/ethos/routes.ts` |
 | Shared policy registry | `shared/ethos-policy.ts` |
-| Operational tuning types | `shared/schema.ts` (~line 1618+) |
+| Operational tuning types | `shared/schema.ts` (`OperationalTuning*` interfaces) |
 | Scope classifier | `server/scopeClassifier.ts` |
 | Approval resolver | `server/approvalResolver.ts` |
 | Record override helper | `server/ethos/recordOverride.ts` |
+
+## Postures, settings, adjustments, and exceptions
+
+The Ethos sets a value for every setting in four layers, each applied over the one before:
+
+1. **The posture.** A college picks an operations posture (`balanced`, `governance`, `compliance`, `innovation`, `stewardship`, `agility`) and a student posture (`balanced`, `success`, `access`, `rigor`, `formation`, `inclusion`). `shared/ethos-presets.ts` holds what each posture sets. Balanced sets nothing and reads the defaults.
+2. **The college's adjustment.** An institutional admin may move a setting to a value inside its band, with a reason of ten characters or more. `shared/ethos-adjustments.ts` keeps it on the Ethos version (`institutional_ethos_versions.adjustments`, copied to `institutional_profiles.ethos_adjustments`) with who set it, why, and when. An out-of-range value is refused in words, never clamped. Every change writes an `ethos.adjust` History row, and a posture change asks whether to keep or clear adjustments.
+3. **A department's exception** (`ethos_department_exceptions`). A department chair or head asks for a value inside the range for one academic year (`shared/ethos-academic-year.ts`). It is decided on Approvals as the `ethos_department_exception` kind, by the dean of the department's college, else the institutional admins (`deciders.ts`). The asker never decides.
+4. **A project's exception** (`ethos_project_exceptions`). A project's owner or committee lead asks for another value for that project only, applied only before its committee's first vote. Today the one such setting is how the project's committee decides (`projects.governanceModel`).
+
+`shared/ethos-exceptions.ts` decides, before any ask, whether the college takes exceptions at all, from whom, on which settings, and who is left out (`institutional_profiles.ethos_exceptions_allowed`). An ask outside it is refused on the server.
+
+`shared/ethos-knobs.ts` is the one table of settings. Each row names its dotted path, its band or choices, who may move it (`college`, `department`, or `bound` by the posture), and the code that reads it. The census test fails if a posture sets a value with no row, or a row names a reader that doesn't read it.
+
+How a new project's committee decides is a good example: `server/projectGovernanceDefault.ts` reads the four layers, and every path that creates a project calls it (held by `scripts/__tests__/project-governance-doors.test.ts`).
+
+### What a posture moves in the score
+
+A posture changes **Readiness only**, never the Proof Standard, a seal, or peer position. `shared/ethos-ici.ts` computes a posture's ICI weights from the registry's deltas, holds each factor between half and double its default, and rebalances them to sum to one. The server's save and the `/ethos` panel both read it. See [Score family and the ICI](/engineering/foundations/score-family).
+
+### Ethos configuration and the assistant
+
+`/ethos` is the landing: the recommended posture and why. `/ethos/configuration` lists every setting with its value, the college's adjustment behind the institutional admin's edit state, and an Exceptions column. The Ethos assistant (`POST /api/institution/ethos/assistant/ask`) reads the same settings the page shows (`settingsRead.ts`) and only proposes changes: a person fills them into the form and saves. A reply that states a figure the settings don't hold is not shown.
 
 ## Binding vs default
 
@@ -69,7 +103,7 @@ The chosen posture lives in **two places that must agree**:
 
 Use this when auditing that every ethos knob is actually read outside the defaults/presets/schema:
 
-1. **Enumerate the source of truth:** `OperationalTuning*` interfaces in `shared/schema.ts` (~line 1618+), plus `server/ethos/defaults.ts` and `server/ethos/presets.ts`.
+1. **Enumerate the source of truth:** `OperationalTuning*` interfaces in `shared/schema.ts` (`OperationalTuning*` interfaces), plus `server/ethos/defaults.ts` and `server/ethos/presets.ts`.
 2. **Prove each knob has a consumer:** grep `server` for the knob name. If the only hits are defaults/presets/schema, it is **orphaned**.
 3. **Predicate-fact knobs** must be projected by `ethosFactBag` and whitelisted in `server/approvalResolver.ts`.
 4. **Typed-consumer knobs** must have a caller outside `server/ethos/`. Confirm each declares a binding mode.
@@ -77,6 +111,7 @@ Use this when auditing that every ethos knob is actually read outside the defaul
 
 ## Rules and gotchas
 
+- **Add a setting to `shared/ethos-knobs.ts` with its reader**, or the census test fails.
 - **Treat any ethos value with no reader as a latent orphan**, not a feature. The `approvals` step-param block was orphaned until wired into the resolver.
 - **There is no generic side-channel.** Ethos reaches approvals only through the three paths above and proposals only through the two above.
 - **Always write both stores** (versioned + denormalized) in any new save path, or the disconnect returns silently.

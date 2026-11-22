@@ -17,7 +17,9 @@ Proof uses Drizzle ORM with PostgreSQL. Schema changes are applied with `drizzle
 | `docs/schema-migrations.md` | Schema change workflow and CI jobs |
 | `docs/pgvector-migration.md` | Enabling and backfilling pgvector embeddings |
 | `docs/migration-and-db-push.md` | Phase 1 migration notes |
-| `scripts/post-merge-prep.cjs` | Post-merge pgvector extension + index setup |
+| `scripts/post-merge.sh` | Post-merge install, prep, and drift check |
+| `scripts/post-merge-prep.cjs` | Idempotent schema deltas, pgvector extension and index setup |
+| `scripts/post-merge-drift-check.ts` | Fails if any schema table or column is missing from the live database |
 | `scripts/unblock-db-push.ts` | Break-glass recovery for enum-recreation blockers |
 
 ## Drizzle and the canonical schema
@@ -76,7 +78,17 @@ The retriever tries pgvector first and falls back to the JSONB+cosine method if 
    - `schema-apply`: applies the full schema to an empty Postgres to prove it is internally consistent.
    - `schema-upgrade`: applies `main`'s schema first, then pushes your schema onto a populated database. This fails if your change cannot cleanly upgrade an existing DB (for example, an enum recreation blocked by a dependent index or an unsafe column-type change).
 
-Both jobs run on a PR only when it changes what drizzle-kit loads: `shared/schema.ts`, its runtime imports (such as `shared/pgvector.ts`), `drizzle.config.ts`, the migrations folder, or package files. On any other PR they are skipped.
+Both jobs run on a PR's full suite (when it is marked ready) and only when it changes what drizzle-kit loads: `shared/schema.ts`, its runtime imports (such as `shared/pgvector.ts`, `shared/record-states.ts`, `shared/task-kinds.ts`), `drizzle.config.ts`, the migrations folder, or package files. On any other PR they are skipped. If you add a runtime import to `schema.ts`, add it to the `schema` filter in `.github/workflows/unit-tests.yml`; `scripts/__tests__/ci-minutes.test.ts` fails until you do.
+
+### Dated SQL files and the post-merge prep
+
+`migrations/` holds a dated SQL file for most schema deltas (for example `20261121_sf6_1e_policy_recorded_review.sql`). These are records, not an applied sequence: `drizzle-kit migrate` is not used. The same deltas are applied idempotently by `scripts/post-merge-prep.cjs`, which `scripts/post-merge.sh` runs after a merge so `drizzle-kit push` never stops on an interactive prompt. `scripts/post-merge-drift-check.ts` then verifies every table and column in `shared/schema.ts` exists in the live database and fails loudly if not.
+
+When you add a column a running database needs, teach `post-merge-prep.cjs` about it as well as editing `shared/schema.ts`.
+
+### Row-level security policies
+
+The six tables that feed AI prompts (`documents`, `document_chunks`, `standards`, `policies`, `narrative_sections`, `evidence_slots`) declare a tenant row policy in `shared/schema.ts` (`tenantRowPolicy`). Each carries an indexed `institution_id`. See [Tenancy and auth](/engineering/foundations/tenancy-and-auth).
 
 ### Deploy-time drift prevention
 

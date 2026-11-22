@@ -1,0 +1,91 @@
+---
+title: "Catalog pipeline and delivery"
+description: "How agency standards are fetched, checked, staged, and delivered to colleges, the run ledger that records every pass, and the college's own copies."
+sidebarTitle: "Catalog pipeline"
+---
+
+The platform keeps one catalog of agency standards. A pipeline fetches each agency's published source, checks it, compares it with the catalog, and stages the differences for an operator to approve. Approved changes are then delivered to every college that holds the agency, as the college's own copy. Every pass, whatever started it, is a row in one run ledger.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Run ledger rules | `shared/pipeline-run.ts` |
+| Run ledger tables | `shared/schema.ts::pipeline_runs`, `pipeline_run_steps`, `platform_clock_pauses` |
+| Writing runs and steps | `server/pipelineRuns.ts`, `server/pipelineRunContext.ts` |
+| The fetch gate | `shared/source-fetch-gate.ts` |
+| Source holds (one run per source) | `server/sourceHold.ts` |
+| Delivery service | `server/catalogSyncService.ts` |
+| Delivery as a run | `server/deliveryRun.ts`, `shared/delivery-order.ts` |
+| Delivery page and report | `server/deliveryReport.ts`, `shared/delivery-report.ts` |
+| Source repair | `server/sourceRepair.ts` |
+| Clocks on the desk | `server/platformClocks.ts`, `shared/platform-clocks.ts` |
+| Nightly sweep | `server/workers/sourceMonitorSchedule.ts`, `server/sourceMonitorRunner.ts` |
+| Catalog-against-source checks | `server/modules/catalog-source-check/*`, `server/modules/rule-page-check/*` |
+| Operator reports | `shared/operator-report-catalog.ts`, `shared/operator-reports.ts`, `server/operatorReports.ts` |
+| College copies | `shared/college-copies.ts`, `server/collegeCopies.ts` |
+| Contracts | `docs/design/operator-desk.md`, `docs/design/run-controls.md`, `docs/design/pipeline-reports.md`, `docs/design/manage-compliance.md` |
+
+## The run ledger
+
+`pipeline_runs` holds one row per run of a job. `pipeline_run_steps` holds its steps (one per source, or one per college for a delivery).
+
+| Job (`PIPELINE_JOBS`) | Shown as | What it is |
+| --- | --- | --- |
+| `source_sweep` | Source sweep | The nightly check of every monitored source |
+| `prove_agency` | Sync | An operator's Sync of one agency |
+| `ingestion` | Fetch standards | The older fetch-and-extract path, joined to the ledger |
+| `delivery` | Delivery | A sync of approved changes to colleges |
+| `source_repair` | Source repair | The keeper's proposal for one broken source |
+
+A run records its trigger (`schedule`, `boot`, `catch-up`, `operator`, `approval`, `sync`, `retry`, `keeper`, `college`, `confirmed`), its status (`queued`, `running`, `completed`, `failed`, `interrupted`, `stopped`), its per-stage counts, the app revision and instance that ran it, and a heartbeat. A run whose heartbeat goes silent is closed `interrupted`; a run whose work fails is `failed`.
+
+### Sync stages
+
+A Sync walks one agency through `fetch → gate → read → compare → stage`, then a `deliver` stage that sends only what an operator already approved and nothing has delivered yet. Approval and delivery stay separate acts.
+
+- **Gate.** `shared/source-fetch-gate.ts` judges every fetched copy against the operator's expectation (type, anchors) or the last good read. A rejected read counts as a failed fetch and the stored copy is kept. A PDF source that answers with a web page fails.
+- **Hold.** `server/sourceHold.ts` leases a source to one run at a time, across instances. A second run is refused with `SourceHeldError`.
+
+### Run controls
+
+An operator can stop or pause a live run (`RUN_CONTROLS`), resume it, re-run from the read, retry failed colleges, or choose colleges for a delivery. The routes sit under `/api/admin/pipeline-runs/:runId/*`. The run checks its `control` column between sources and stages.
+
+## Delivery
+
+Every sync to colleges, whichever door started it, goes through `executeSyncWithAudit` (`server/catalogSyncService.ts`) and opens a `delivery` run with one `deliver` step per college. Colleges are processed by name and standards in catalog order (`shared/delivery-order.ts`). Each delivery writes a `catalog_delivered` row on the college's own standard History.
+
+The delivery's page is `/admin/runs/:id`. Its CSV, Excel, and PDF export uses the shared report foundation.
+
+## College copies
+
+A college holds its own copy of each standard of each agency it confirmed. `shared/college-copies.ts` decides a copy's standing:
+
+- **To acknowledge**: a delivered change nobody at the college has acknowledged yet.
+- **Behind**: the copy is older than the catalog's version.
+- **Current**: otherwise.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/college/agencies` | The college's agencies and how each stands |
+| `GET /api/college/copies` | The college's copies |
+| `GET /api/college/deliveries` | Deliveries that reached the college |
+| `POST /api/college/deliveries/acknowledge` | Acknowledge several delivered changes at once |
+| `POST /api/college/agencies/:agencyId/sync` | Pull an agency that is behind (trigger `college`) |
+| `GET /api/standards/:id/copy`, `POST /api/standards/:id/acknowledge` | One standard's copy and its acknowledgement |
+
+The college's standards routes answer a college member from its copies, through `overlayCollegeCopies`. Confirming an agency delivers its standards at once (trigger `confirmed`). Institutional admins and compliance officers read the Manage Compliance page (`/manage-compliance`); the agency page reads the college's copies for them.
+
+## The operator desk
+
+Operators work the pipeline from `/admin/sync-station`, `/admin/catalog`, `/admin/catalog/review`, `/admin/source-monitoring`, and `/admin/parsers`.
+
+- **Clocks.** `GET /api/admin/platform-clocks` lists the platform's clocks (`source_sweep`, `catalog_backfill`, `parse_queue`). Run now, Pause, and Resume each write a History row.
+- **Source repair.** When a source breaks, `server/sourceRepair.ts` reads candidate addresses through the fetch gate and proposes one. An operator approves it with Use this address, or snoozes it.
+- **Reports.** Six operator-only reports open at `/admin/reports/:id`: `pipeline-runs`, `source-health`, `catalog-provenance`, `review-queue`, `upgrade-interest`, and `index-both-ways`. Operators can save, share, and schedule them like college reports.
+
+## Related pages
+
+- [Reporting](/engineering/areas/reporting)
+- [Tenancy and authentication](/engineering/foundations/tenancy-and-auth)
+- [Integrations internals](/engineering/areas/integrations-internals)

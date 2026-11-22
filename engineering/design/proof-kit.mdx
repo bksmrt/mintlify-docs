@@ -19,6 +19,15 @@ Proof Kit is the product's editorial design system. It covers the painted waterc
 | Ornaments | `client/src/components/proof/ornaments.tsx` |
 | Review grammar marks | `client/src/components/proof/marks.tsx` |
 | Journal page kit | `client/src/components/proof/journal.tsx` |
+| The one register (list) component | `client/src/components/register/register.tsx` |
+| Tab ribbon | `client/src/lib/proof/tabs.ts` |
+| Register scope line | `client/src/components/proof/register-scope.tsx` |
+| Compare pill | `client/src/components/proof/compare-pill.tsx` |
+| Pill switch | `client/src/components/proof/pill-switch.tsx` |
+| Row actions (one ⋯ per row) | `client/src/components/proof/row-actions.tsx` |
+| Discussion mark | `client/src/components/proof/discussion-mark.tsx` |
+| The manuscript pass | `client/src/components/proof/manuscript/` |
+| Preferences (handwriting and more) | `client/src/components/proof/preferences.tsx` |
 | Antique plate layer | `client/src/components/proof/antique.tsx` |
 | Living style guide | `client/src/pages/proof-kit.tsx` |
 | CSS variables | `client/src/index.css` (`--proof-*`) |
@@ -30,7 +39,7 @@ The primary visual is fine hand-drawn navy line art on a paper or canvas ground.
 
 Marginalia is a recurring, sparing device: margin notes, review-note callouts, footnote citations, and the Proof Note Mark (a looped-'p' loop plus jot stroke) as an inline gesture. The Note Mark is never a bullet or logo.
 
-Brand identity is the editorial serif "Proof" wordmark plus the looped-'p'-with-evidence-dot icon family. Palette: navy ink, paper, oak, sage. Voice: warm, premium, archival, editorial, academic, human.
+Brand identity is the editorial serif "Proof" wordmark plus the looped-'p'-with-evidence-dot icon family. Palette: warm charcoal ink, paper, umber, sage. Voice: warm, premium, archival, editorial, academic, human.
 
 ## Living style guide
 
@@ -42,16 +51,18 @@ Color carries meaning. The semantic tokens are defined in `client/src/lib/proof/
 
 | Token | Role |
 | --- | --- |
-| `ink` | Trust and authority (primary text, outlines) |
+| `ink` | Trust and authority (primary text, outlines); warm charcoal `#2B2622` |
 | `sage` | Evidence and growth (add, positive) |
-| `oak` | Review and validation (review state, citations, overlines) |
+| `oak` | Review and validation (review state, citations, links); the token keeps its name but is umber `#7D6252` |
 | `clay` | Attention and action (focus, due, destructive) |
 | `violet` | Notes and insight (reviewer marginalia) |
 | `mist` | Neutral and calm (reference leaders) |
 | `slate` | Structure and support (hierarchy, scaffolding) |
 | `teal` | Connection and reference |
 
-Surfaces: `paper` (warm illustration ground), `surface` (card), `hair` (hairline rules), plus `ink-soft` (secondary text).
+Surfaces: `paper` (the ground), `surface` (card), `hair` (hairline rules), plus `ink-soft` (secondary text). In light mode the page, a card, a panel, the sidebar, and a menu share one fill (`#F5F2EE`); a card is set apart by its hairline, never a lighter fill. `scripts/__tests__/pal-palette.test.ts` holds the palette.
+
+The primary button reads its own tokens (`--proof-cta-fill`, `--proof-cta-hover`, `--proof-cta-press`, `--proof-cta-border`, `--proof-cta-edge`): a charcoal fill in light, and no fill with a cream border and offset edge in dark.
 
 Accent hues are brand-fixed across light and dark. Only `paper`, `surface`, `ink`, and `hair` flip in dark mode. Marks are always paired with text; never rely on color alone.
 
@@ -96,7 +107,7 @@ The Journal register kit is a full page grammar for list and detail screens set 
 
 ### Idioms
 
-1. **Journal register** (deep conversion): for registers and detail leaves. The page becomes a flat parchment sheet scoped under `.pf-journal`.
+1. **Journal register** (deep conversion): for registers and detail leaves, scoped under `.pf-journal`. Large-masthead pages render `<JournalPage looseLeaf>` so the masthead and the register sit straight on the desk (held by `scripts/__tests__/journal-loose-leaf.test.ts`). On a record page the sheet (`.pf-sheet`) is a measure only: no fill, hairline, lift, grain, or texture. A pinned record keeps its ribbon as the left rule.
 2. **Mural header** (light touch): for area hubs that keep their body. Swap only the header for `MuralPageHeader`.
 
 ### Register shell
@@ -135,8 +146,8 @@ The Journal register kit is a full page grammar for list and detail screens set 
 
 | shadcn / generic | Journal replacement |
 | --- | --- |
-| Card rows, Table | `RegisterHead` + `RecordRow` |
-| Tabs | `StatusBar` / `.pfj-statusbar` |
+| Card rows, Table | The register component (`components/register`) |
+| Tabs | `TabRibbon` / `.pfj-statusbar` (leaves of a page only, never filters) |
 | Badge | `StandingMark` |
 | Button | `.pfj-btn` / `ProofButton` |
 | Skeleton | italic retrieving line / `ProofLoadingState` |
@@ -155,6 +166,21 @@ Three rules govern expression of state:
 2. **Severity is something done to the page, not something the page is.** It lives in the margin via `MarginRule`: one stroke for a heading, two for urgent. Scope the positioned ancestor to the heading alone.
 3. **A quotation is a person's words, and nothing else.** `Quotation` is the committee revision-comment pattern: hanging block, oversized opening quote in the speaker's tone, serif italic body, small-caps attribution. Reserve it for text a named person actually wrote.
 
+## The manuscript pass
+
+The manuscript pass (`client/src/components/proof/manuscript/`, exported as `ManuscriptPass`) presents a first pass as a full page of paper. The assistant's words are written in by hand at the centre (Alex Brush, let in along its pen path), the person answers in their own words, and what is kept is set in type. One thought shows at a time; nothing else appears until the question settles, and nothing slides. Every action is an icon pressed into the paper with a keyboard key; `Ctrl`/`⌘`+`Enter` answers.
+
+Four first passes mount it:
+
+| Pass | Component |
+| --- | --- |
+| A standard's first pass in the compliance workspace (`?guide=1`) | `components/standard-walk/manuscript-walk.tsx` |
+| The guided Ethos selection, on `/ethos` and at setup | `components/ethos/manuscript-selection.tsx` |
+| Ethos configuration's first pass | `components/ethos/manuscript-config.tsx` |
+| A gap's evaluation | `components/gaps/manuscript-gap.tsx` |
+
+Each person turns it on or off under Profile › Appearance › Handwriting (`components/profile/handwriting-prefs.tsx`); with it off, the step-by-step form is used. A page built on the pass never loses the person's words: every ask resolves taken or not, a change carries the revision it began from, and a re-read never overwrites a field she is editing.
+
 ## Rollout
 
 Adoption is incremental, page by page. Wave order: rails and docs first, then core register and detail pairs, then hubs and partials, then Evans-to-Proof migration, then large workspaces, then the long tail. See `docs/areas/proof-antique-editorial.md` for the full conversion protocol, safeguards, and gotchas.
@@ -163,7 +189,8 @@ Adoption is incremental, page by page. Wave order: rails and docs first, then co
 
 - **Fonts are preloaded in `client/index.html`.** Do not add new font loading. The kit references them via `font-['…']` arbitrary classes.
 - **`--proof-paper-base` never flips.** Keep painted plates on it in both themes.
-- **Filled oak CTAs use the deep ramp** (`#7E5827` rest, `#8A6230` hover, `#6F4D22` press, `#5E411D` edge) with `--proof-paper-base` text for contrast.
+- **The primary button reads the `--proof-cta-*` tokens**, never a hard-coded color, so it flips correctly in dark mode.
+- **No new seal shapes.** The concentric-ring seal is never drawn for a new mark, badge, tier, or score. The ICI's own foil seal stands.
 - **Any reusable SVG `id` derives from `useId()`.** Hardcoded ids break filters when a component renders twice.
 - **Badges are no-fill** (accent text + border over a 10% tint). Only CTAs and meters carry solid fills.
 - **Import from the barrel `@/components/proof`,** never deep paths.

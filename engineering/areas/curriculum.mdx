@@ -67,7 +67,7 @@ The course validation engine lives in `server/courseValidationService.ts`. It co
 10. Domain K validators (fail closed: `CRS_DOMAIN_K_RUNTIME_ERROR`)
 11. Exemptions overlay (`exemption-core.ts`)
 
-Courses transition through `draft → review → approved → published`. `approved` and `published` are gated: `POST /api/courses/:id/request-approval` and `/publish` both re-run the engine and refuse with `422 { error, validation }` when `canPublish` is false. `PATCH /api/courses/:id` answers `400 use_transition_route` when the body would move into a gated status. The bulk status change (`POST /api/bulk/course`) reports held rows under `skipped`.
+Courses transition through `draft → review → approved → published`. `approved` and `published` are gated: `POST /api/courses/:id/request-approval` and `/publish` both re-run the engine and refuse with `422 { error, validation }` when `canPublish` is false. `PATCH /api/courses/:id` answers `400 use_transition_route` when the body would move into a gated status. The bulk status change (`POST /api/bulk/:scope` with scope `course`) reports held rows under `skipped`.
 
 The `request-approval` route files a Dynamic Approval Framework request with `subjectKind: "course"`. The chain's terminal step calls `finalizeCourseApproval` in `server/courseApprovalFinalize.ts`; reject and recall revert to `draft`.
 

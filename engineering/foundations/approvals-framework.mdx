@@ -10,12 +10,16 @@ Proof routes every decision that one person makes on another's submission throug
 
 | File | Purpose |
 | --- | --- |
-| `shared/schema.ts` | `approval_policies`, `approval_policy_steps`, `approval_step_eligibility_rules`, `approval_requests`, `approval_request_steps`, `approval_request_decisions`, and related enums |
+| `shared/schema.ts` | `approval_policies`, `approval_policy_steps`, `approval_step_eligibility_rules`, `approval_requests`, `approval_request_steps`, `approval_decisions`, `approval_step_rounds`, `approval_delegations`, `approval_asked`, and related enums |
 | `server/approvalResolver.ts` | Pure resolver engine: eligibility expansion, routing modes, override merge, and snapshot flattening |
 | `server/approvalRequests.ts` | Engine runtime: submit, decide, delegate, suspend, recall, and audit-safe transitions |
 | `server/approvals/kinds.ts` | The approval kind registry: every subject kind registers a triage provider |
+| `server/approvals/asked.ts` | The record of who was asked to decide each row |
 | `server/courseApprovalFinalize.ts` | Terminal effects for course-subject requests |
 | `server/programApprovalFinalize.ts` | Terminal effects for program-subject requests |
+| `server/committeeApprovalFinalize.ts` | Terminal effects for committee-decided projects, including a proposal's graduation |
+| `client/src/components/approvals/decision-card.tsx` | The one decision card |
+| `client/src/components/committee/signoff-words.ts` | The decision words |
 | `server/modules/approval-policy/generator.service.ts` | No-code approval policy generation service |
 | `docs/design/approvals-one.md` | The contract: one decision card, one reason rule, one feed |
 | `.agents/memory/approval-request-changes-loop.md` | Resubmit-as-new-cycle design for returned proposals |
@@ -57,7 +61,7 @@ Per-project customization writes overrides with `source='project_customize'` bef
 
 ### Phase 5: firm consultant snapshot
 
-The resolver accepts a `ResolverFirmConsultant` snapshot for `firm_user` and `firm_role` eligibility kinds. The caller filters `engagedInstitutionIds` to active engagements before passing it in.
+The resolver accepts a `ResolverFirmUser` snapshot for `firm_user` and `firm_role` eligibility kinds. The caller filters `engagedInstitutionIds` to active engagements before passing it in.
 
 ## Runtime engine
 
@@ -67,7 +71,8 @@ The resolver accepts a `ResolverFirmConsultant` snapshot for `firm_user` and `fi
 - `decideApprovalStep`: records a decision, advances the step, and triggers terminal effects
 - `withdrawForResubmit`: closes the current cycle as withdrawn and starts a new one
 - `delegateApprovalStep`: reassigns a step to another eligible user
-- `suspendApprovalRequest`: pauses a request
+- `resumeApprovalRequest`: resumes a suspended request
+- `bulkDecideApprovalRequests`: decides several requests of one kind at once
 - `recallApprovalRequest`: allows the submitter to pull the request back
 
 Every engine transition writes an audit row. The `auditSafe` helper is crash-isolated: a failed audit write does not roll back the transition.
@@ -98,22 +103,36 @@ The kind registry in `server/approvals/kinds.ts` extends this to every decision 
 
 ### Registered kinds
 
-| Kind | Source module | Decision surface |
+`APPROVAL_KINDS` in `server/approvals/kinds.ts` lists every provider. The feed is served at `GET /api/approvals/triage`.
+
+| Kind | Source module | Decision |
 | --- | --- | --- |
-| `project` | `curriculum-proposals/triage` | Curriculum proposals |
+| `project` | `curriculum-proposals/triage` | Project proposals, including every compliance project |
 | `faculty_invitation` | `curriculum-proposals/triage` | Faculty appointments |
 | `course` | `curriculum-proposals/triage` | Course approvals |
 | `program` | `curriculum-proposals/triage` | Program approvals |
-| `narrative_section` | `narrative-readings/triage` | Narrative section reviews |
+| `narrative_section` | `narrative-readings/triage` | A narrative section's review |
 | `curriculum_exception` | `curriculum-exceptions/triage` | Substitutions, waivers, exceptions |
-| `validation_exemption` | `validation-exemptions/triage` | Exemption requests |
+| `validation_exemption` | `validation-exemptions/triage` | Validation exemption requests |
 | `recall` | `recall/triage` | Committee recall |
-| `narrative_reconciliation` | `narrative-reconciliation/triage` | Firm reconciliation proposals |
-| `project_attach` | `project-attach/triage` | Attach requests |
+| `narrative_reconciliation` | `narrative-reconciliation/triage` | A firm's reconciliation proposal |
+| `project_attach` | `project-attach/triage` | Putting one project under another |
 | `compliance_exception` | `compliance-exceptions/triage` | Compliance rule exceptions |
+| `ethos_department_exception` | `ethos-department-exceptions/triage` | A department's exception to an Ethos setting |
+| `ethos_project_exception` | `ethos-project-exceptions/triage` | A project's exception to an Ethos setting |
 | `narrative_suggestion` | `narrative-suggestions/triage` | Narrative suggestions |
+| `risk_delay` | `risk-delay/triage` | Allow a corrective action's delay past its grace |
+| `cause_question` | `cause-question/triage` | Is a gap's cause resolved, asked before the gap closes |
+| `yes_check` | `yes-check/triage` | Another look: is the cause still resolved |
+| `objective_suggestion` | `strategic-plan/suggestion-triage` | A suggested strategic plan objective |
+
+Kinds marked `chainOnly` (`risk_delay`, `cause_question`, `yes_check`) are questions asked of a person. They are listed only to their chain: the person asked, anyone answering in their place, and everyone previously asked.
 
 The `approvalTriageRows` function collects every kind's rows, merges historical participant lists via `withAsked`, and returns a single sorted feed.
+
+## Compliance projects go through approval
+
+Every path that makes a compliance project (the wizard, the regulatory desk, a policy's review, drift actioning) calls the helpers in `server/complianceProposal.ts`. The project is created as a proposal (`pending_proposal`), kept off the Projects list, and sent through the college's approval policy for compliance projects as the `project` kind. Once approved, `server/committeeApprovalFinalize.ts` graduates it into a working project; a declined proposal is settled by the engine.
 
 ## The one decision card
 

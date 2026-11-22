@@ -12,7 +12,7 @@ Proof is a modular-monolith B2B SaaS platform that helps consulting firms manage
 
 ## Architecture at a glance
 
-The server is a single Express application (`server/index.ts`) that mounts API routes from `server/routes.ts`, serves the Vite-built client, and starts background workers for parsing, SIS sync, regulatory intelligence, and report delivery. The client is a React SPA rendered with Vite, built on Tailwind CSS, Radix UI primitives (via Shadcn/ui), Framer Motion, and TanStack Query. PostgreSQL is the only database, extended with `pgvector` for embedding storage.
+The server is a single Express application (`server/index.ts`) that mounts API routes from `server/routes.ts`, serves the Vite-built client, and starts pg-boss workers and schedules for parsing, SIS sync and writeback, ICI recomputation, the nightly source sweep, catalog backfill, control health, peer snapshots, and scheduled report delivery. The client is a React SPA rendered with Vite and routed with wouter, built on Tailwind CSS, Radix UI primitives (via Shadcn/ui), Framer Motion, TanStack Query, and the Proof design kit. PostgreSQL is the only database, extended with `pgvector` for embeddings and protected by row-level security on the tables that feed AI prompts.
 
 Shared types and the Drizzle schema live in `shared/`, imported by both server and client. This keeps the runtime contract in one file: `shared/schema.ts` defines every table, enum, and relation, and `drizzle-zod` derives validators from it.
 
@@ -20,14 +20,15 @@ Shared types and the Drizzle schema live in `shared/`, imported by both server a
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS, Radix UI / Shadcn/ui, Framer Motion, TanStack Query |
-| Backend | Express.js, TypeScript, Node.js 22+ |
+| Frontend | React 18, TypeScript, Vite 5, wouter, Tailwind CSS 3, Radix UI / Shadcn/ui, Framer Motion, TanStack Query 5 |
+| Backend | Express 4, TypeScript, Node.js 22.12+, pg-boss for queues and schedules |
 | ORM & validation | Drizzle ORM, drizzle-zod, Zod |
 | Database | PostgreSQL 16 with pgvector extension |
 | Auth | Replit Auth, WorkOS |
-| AI / LLM | OpenAI, Anthropic, Google (Gemini) via the ai-routing module |
+| AI / LLM | Anthropic (Claude, primary), OpenAI, and Google Gemini through `server/modules/ai-routing`; embeddings on OpenAI |
 | Payments | Stripe |
-| Build tool | Vite (client + server via tsx) |
+| Build tool | `tsx script/build.ts` (Vite for the client, bundled server in `dist/index.cjs`) |
+| Tests | Vitest 3, Playwright |
 
 ## Request lifecycle
 
@@ -36,9 +37,10 @@ A typical request flows like this:
 1. **Ingress**: `express()` in `server/index.ts` applies `securityHeaders`, rate limiting, and JSON parsing.
 2. **Auth**: Session middleware (`express-session` with `connect-pg-simple`) populates `req.user`. SSO routes in `server/sso/` handle WorkOS and Replit Auth flows.
 3. **Routing**: `registerRoutes` in `server/routes.ts` mounts domain route groups (curriculum, compliance, approvals, billing, integrations, and so on).
-4. **Tenancy**: Every route resolves the caller's institution and firm scope. The `bksmrt` operator role is read-only on tenant data by default; see the [Bksmrt write policy](/engineering/foundations/tenancy-and-auth).
-5. **Handler**: Route handlers call domain modules under `server/modules/*`, shared helpers, or the Drizzle db client.
-6. **Response**: JSON responses are shaped with Zod schemas from `shared/`. The client SPA handles routing client-side; server-side navigation targets are validated by CI.
+4. **Tenancy**: Every route resolves the caller's institution and firm scope, and `rowScopeMiddleware` sets the request's row scope for Postgres row-level security. The `bksmrt` operator role is read-only on tenant data by default; see [Tenancy and auth](/engineering/foundations/tenancy-and-auth).
+5. **Module gate**: `buildModuleGateMiddleware` refuses a route whose module the tenant hasn't licensed with `402`; see [Billing and modules](/engineering/foundations/billing-and-modules).
+6. **Handler**: Route handlers call domain modules under `server/modules/*`, shared helpers, or the Drizzle db client.
+7. **Response**: JSON responses are shaped with Zod schemas from `shared/`. The client SPA handles routing client-side; server-side navigation targets are validated by CI.
 
 ## Key cross-cutting rules
 
@@ -51,6 +53,9 @@ The codebase is held together by a small set of rules that apply everywhere. Eac
 | **Approvals framework** | Dynamic Approval Framework: policy schema, resolver engine, no-code builder, and the kind registry | [Approvals framework](/engineering/foundations/approvals-framework) |
 | **Design contracts** | Canonical lists, marks, decisions, and registers; every redesign surface carries a completeness contract | [Contributing workflow](/engineering/contributing/workflow) and [Proof design kit](/engineering/design/proof-kit) |
 | **Database schema** | Single source of truth in `shared/schema.ts`, applied with `drizzle-kit push`, guarded by two CI schema jobs | [Database and migrations](/engineering/foundations/database-and-migrations) |
+| **Module gate** | One registry (`shared/modules.ts`) decides which routes and pages each licensable module gates | [Billing and modules](/engineering/foundations/billing-and-modules) |
+| **Score family** | Readiness stays inside the college; anything comparative or external is the Proof Standard; every feature states its score touch | [Score family and the ICI](/engineering/foundations/score-family) |
+| **Reports** | Every report's address lives in `shared/report-catalog.ts` and every export goes through `server/reportWorkbook.ts` | [Reporting](/engineering/areas/reporting) |
 
 ## Per-area docs
 
@@ -60,11 +65,11 @@ The repo carries deeper architecture notes under `docs/areas/`. Each file maps w
 
 <CardGroup cols={2}>
   <Card title="Foundations" icon="layer-group" href="/engineering/foundations/tenancy-and-auth">
-    Tenancy, auth, database, migrations, approvals, and AI services.
+    Tenancy, auth, database, approvals, AI services, billing modules, and the score family.
   </Card>
 
   <Card title="Product areas" icon="puzzle-piece" href="/engineering/areas/curriculum">
-    Curriculum, sections, teaching, standards, ethos, suggestions, integrations, and reporting internals.
+    Curriculum, sections, teaching, standards, Ethos, suggestions, integrations, reporting, and the catalog pipeline.
   </Card>
 
   <Card title="Design" icon="palette" href="/engineering/design/proof-kit">
