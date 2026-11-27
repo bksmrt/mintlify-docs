@@ -31,7 +31,7 @@ Each connection has its own writeback settings, changed only by an institutional
 
 - **Master switch**: off by default. While off, the connection gets no writeback jobs.
 - **Writable record types**: none by default. Each type must be allowed explicitly.
-- **Schedule**: when queued jobs run: every 15 minutes (the default), hourly, daily, weekly, or off. When off, jobs wait until someone clicks **Run now** on the job in **SIS Write-Back Jobs**.
+- **Schedule**: when queued jobs run: every 15 minutes (the default), hourly, daily, weekly, or off. When off, jobs wait until someone chooses **Run now** from the job's menu on the **Write-back jobs** page.
 
 ## Safety
 
@@ -59,13 +59,15 @@ If the SIS returns rate-limit responses (HTTP 429) or transient server errors, t
 
 ## Conflicts and jobs
 
-When a writeback row returns a conflict, it appears in **SIS Write-Back Conflict Queue**. An institutional admin, or a compliance officer with the SIS management grant, clicks **Resolve** on the row. The **Resolve write-back conflict** dialog shows **Catalog (proposed)**, **SIS (last known baseline)**, and **SIS (observed now)** side by side, then offers three choices:
+When a writeback row returns a conflict, it appears on the **Write-back conflicts** page, together with rows the SIS failed to take. An institutional admin, or a compliance officer with the SIS management grant, chooses **Resolve…** from the row's menu. The **Resolve write-back conflict** dialog shows **Catalog (proposed)**, **SIS (last known baseline)**, and **SIS (observed now)** side by side, then offers three choices:
 
 - **Local wins — apply catalog → SIS**: push the Proof value to the SIS
 - **Remote wins — pull SIS → catalog**: keep the SIS value and update Proof to match
 - **Merge — push a hand-curated value to SIS**: pick a side per field with **Use catalog** or **Use SIS**, or edit the value directly
 
-**SIS Write-Back Jobs** lists each job with its trigger (project approval, manual, scheduled, or retry), its times, and its counts of applied, skipped, conflict, and failed rows. A queued job offers **Run now**, and a finished one **Retry**. Inside a job, each failed row has its own **Retry** and **Skip** buttons.
+Every resolution needs a written reason of at least 15 characters. Under **Filters**, narrow the conflicts by **Connection** and **Type** (course, program, department, prerequisite, or requirement group), or search external keys and reasons.
+
+The **Write-back jobs** page lists each job with its trigger (project approval, manual, scheduled, or retry), its times, and its counts of applied, skipped, conflict, and failed rows. Under **Filters**, narrow the list by **Status** and **Connection**; you can pick several values in each, for example both **Failed** and **Partial**. Each job's menu offers **Details**, a queued job also offers **Run now**, and a failed or partial job **Retry**. Inside a job's details, each failed or pending row has its own **Retry** and **Skip** buttons; a skip asks for a reason.
 
 ## Turning writeback off
 
