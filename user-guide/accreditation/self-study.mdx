@@ -1,107 +1,113 @@
 ---
 title: "Self-study document"
-description: "Assemble, edit, and export your institution's accreditation self-study from narrative sections authored across standards."
+description: "Read, edit, and export your institution's accreditation self-study, assembled from the narrative sections written across standards."
 sidebarTitle: "Self-study"
 ---
 
-The **Self-study document** gathers every narrative section your team has written into one cohesive, ordered document. Compliance officers and accreditation liaisons use this screen to review the full narrative, reorder sections, insert supporting tables and charts, and export a PDF for committee or accreditor review.
+The **Self-study document** gathers every narrative section your team has written into one ordered document. Compliance officers and accreditation liaisons use it to read the full narrative with the workspace's marks, reorder sections, insert supporting tables and charts, compare saved versions, and export a PDF for committee or accreditor review.
 
 ## How to get here
 
-Open a project from [Projects](/user-guide/accreditation/projects), open its [Compliance workspace](/user-guide/accreditation/compliance-workspace), and select **Self-Study Document**.
+Open a project from [Projects](/user-guide/accreditation/projects), open its [Compliance workspace](/user-guide/accreditation/compliance-workspace), and select **Self-Study Document**. The back arrow at the top left returns you to the workspace.
 
 ## What you see
 
 ### Document header
 
-- **Project name** and a narrative version badge (for example, v3).
-- **Pin version**: lock the self-study to the accreditor catalog version as of now.
-- **Save version**: capture the current state so you can compare or restore it later.
-- **History**: open a list of saved versions with a count badge.
-- **Compare**: open a side-by-side diff between any two saved versions, or between a saved version and the current document.
-- **Export PDF**: download the assembled document.
+The header shows **Self-Study Document**, the project name, and the narrative version (for example, v3). Its controls are:
+
+- **Focus**: read the whole self-study clean. See [Focus](#focus).
+- **Actions**:
+  - **Export PDF**: preview and download the assembled document. See [Export a PDF](#export-a-pdf).
+  - **Compare versions**: compare two saved versions, or a version with the current document. See [Compare versions](#compare-versions).
+  - **Save version…**: capture the current state with a label, so you can compare or restore it later.
+  - **History**, with the number of saved versions: list the saved versions.
+  - In the edit state, also **Pin to the catalog…**, **Import a self-study…**, and **Link one from your library**.
+- **Edit the self-study**: opens the edit state, for people who can write the self-study. Click **Done** to close it. Every change saves as it is made.
+
+Someone who can only read the self-study sees **Focus** and **Actions**.
 
 ### Narrative sections
 
 Each section appears as a card in the order it will export. Every card shows:
 
-- A **drag handle** so you can reorder the section.
-- Its **position number** in the document.
-- The **section title**.
+- Its **position number** in the document and the **section title**.
 - A **type badge**: Claim, Demonstration, Full Narrative, or General.
-- The linked **standard number** and **version**.
-- A **review-note icon** with a count when comments exist.
-- Up and down arrow buttons to move the section.
-- A **Duplicate** button.
+- The linked standard and the section's **version**.
+- A **Writing check** ring.
+- The discussion mark with the number of notes on the section, or a note button when there are none.
 
-### Section editor
+The section's words are drawn with the compliance workspace's own marks: its findings, readings, open suggestions, and drafted sentences not yet placed. Click a mark to open the workspace at that section, where you work it.
 
-Each card contains a rich text editor pre-filled with the section content. Changes are tracked locally until you save.
+### Edit or suggest words
 
-- **Save**: store the updated text.
-- **Revert**: discard local changes and restore the last saved text.
+Click **Edit** on a section to change its words in place, then click **Save** or **Cancel**. If you can't write to the section, for example as a consulting firm's member or a writer the section does not name, you see **Suggest** instead. Your words are sent as a suggestion the college decides.
+
+### Notes
+
+The discussion mark on each section shows its notes. An oak dot means a note is new to you; a filled mark means a note mentions you. Click the mark to open the project's discussion at that note, or click the note button to add one.
 
 ### Embedded elements
 
-Below the editor, any previously inserted elements render inline:
+Below a section's words, any inserted elements render inline:
 
 - **Data tables** with column headers and rows.
 - **Figures and charts**: bar, line, or pie charts with data labels.
 - **Cross-references**: links to other sections, figures, or appendices with an optional note.
 
-Each element has a **delete** button that appears on hover.
+## The edit state
 
-### Insert menu
+Click **Edit the self-study** to change the document's shape. In the edit state:
 
-Every section card has an **Insert** dropdown with three choices:
+- **Reorder sections** by dragging a section's handle, or choose **Move up** or **Move down** from its **⋯** menu.
+- **Duplicate a section** from its **⋯** menu.
+- **Insert** a **Data table**, **Figure / chart**, or **Cross-reference** under a section. The dialog opens empty, with examples as placeholders.
+- **Delete an element**: Proof asks first, then offers **Undo** in place.
+- **Pin to the catalog…**, **Import a self-study…**, and **Link one from your library** from **Actions**.
 
-- **Data table**: enter comma-separated columns and comma-separated rows.
-- **Figure / chart**: choose bar, line, or pie, then enter label-and-value pairs.
-- **Cross-reference**: link to another section, a figure, or an appendix and add an optional note.
+### Import or link a self-study
 
-### Review notes
+If your college already wrote a self-study, bring it in:
 
-Click the **review-note icon** on any section to open the project comment thread and add a note tied to that section. Hovering the icon shows a preview of the latest note. If notes exist, a **View note** (or **View all _N_ notes**) link jumps directly to the comment thread.
+- **Import a self-study…** reads one file and splits it by its headings. Each heading that names a standard on the project becomes that standard's section. You see where each part goes before anything is added.
+- **Link one from your library** searches **Documents** for a self-study and reads it the same way.
 
-### Version pinning
+### Pin to the catalog
 
-Click **Pin version** to open the **Catalog version pinning** dialog.
+**Pin to the catalog…** is offered only on a self-study project linked to its agency. Click it to open the **Catalog version pinning** dialog.
 
-- If the document is not pinned, it tracks the latest accreditor catalog automatically.
-- Click **Pin** to freeze the catalog version. Proof records the date and time.
-- Once pinned, the dialog shows a **delta summary** of every standard added, removed, or changed since the pin date. Each changed standard lists affected narrative sections and evidence slots you can open directly.
+- If the document is not pinned, it reads "Not pinned — tracking the latest catalog."
+- Click **Pin to current catalog** to freeze the catalog version as of now.
+- Once pinned, the dialog shows how many standards were added, removed, or changed since the pin date. A changed standard is drawn with its title from old to new and its description's words marked. Each change lists the narrative sections and evidence it touches, which you can open directly.
 - Click **Unpin** to resume tracking the latest catalog.
+
+If a pin is refused, Proof says why.
+
+## Focus
+
+Click **Focus** to read the whole self-study clean: every section's saved words, with their tables and figures, and no marks, suggestions, drafts, or controls. Anyone who can read the self-study can use it. Press **Esc** or click **Close focus** to return.
+
+## Compare versions
+
+From **Actions**, choose **Compare versions**. A strip opens at the top of the document, comparing the version before the newest with the current document. Use the **vs.** picker to choose the two sides. Only what differs is shown, such as a section renamed from its old title to its new one, and the sections that are the same are counted. Choose **Close the compare** from **Actions** to close it.
+
+From **History**, click **Compare to current** on a saved version to open the same strip.
 
 ### Version history
 
-Click **History** to open the **Document versions** dialog. Each saved version shows:
+From **Actions**, choose **History** to open the list of saved versions. Each shows:
 
 - A **label** you entered when saving.
-- A **trigger badge**: Manual for user-saved versions, or Auto for versions captured after edits, reorders, duplicates, element changes, or restores.
-- A **section count**.
-- The **creator name** and **time since save**.
-- **Compare to current**: open the diff view against the live document.
-- **Restore**: roll the document back to that version. Proof auto-saves a pre-restore version first.
+- A **trigger badge**: **Manual** for versions you saved, or **Auto** for versions captured after an edit, a reorder, a duplicate, an element change, or a restore.
+- A **section count**, the **creator name**, and the **time since save**.
+- **Compare to current**, and **Restore** for people who can write the self-study. Restoring asks first, saves the document as it stands, and offers **Undo** in place.
 
-### Compare versions
+## Export a PDF
 
-Click **Compare** to open the **Compare document versions** dialog.
+From **Actions**, choose **Export PDF**. A preview opens with the file's cover and first page, as for any report.
 
-- Choose a **From version** and a **To version** (or **Current document**).
-- Proof shows a side-by-side diff of every section, highlighting additions, removals, and changes.
-
-## What you can do here
-
-- **Reorder sections** by dragging cards or using the up and down arrow buttons.
-- **Edit narrative text** in any section and save your changes.
-- **Duplicate a section** to reuse its structure elsewhere.
-- **Insert tables, charts, or cross-references** to strengthen the narrative.
-- **Add review notes** on individual sections for team feedback.
-- **Pin the catalog version** to freeze requirements and track future changes.
-- **Save named versions** before major reviews or committee meetings.
-- **Compare versions** to see exactly what changed between drafts.
-- **Restore an older version** if the committee wants to revert.
-- **Export a PDF** for external distribution.
+- Use the **Cover page** and **Illustration** pills to choose whether the file opens on the reports' cover, with or without its illustration. With the cover on, the file also carries a contents page. With it off, the file opens on the first section.
+- Click **Download** to save the PDF.
 
 ## Common tasks
 

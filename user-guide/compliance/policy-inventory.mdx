@@ -14,29 +14,29 @@ Click **Policy Inventory** in the sidebar, under **Management**.
 
 ### Toolbar
 
-A full-width search field sits at the top. Type to find policies by title or policy code. The buttons after it are:
+A search field sits at the top. Type to find policies by title or policy code. The filter icon at its right end opens **Views & filters**. After the search:
 
+- The calendar button opens and closes the **Review Calendar** rail, on wide screens
+- **Actions**: **Import** opens the document import dialog, and **Review calendar** opens the full [Review Calendar](/user-guide/compliance/review-calendar)
 - **New Policy**: opens a dialog to enter a policy by hand
-- **Import**: opens the document import dialog
-- **Review Calendar**: on narrower screens only, where the side rail is hidden
 
 ### Register list
 
 The inventory opens as a journal register. Each row is one policy and shows:
 
 - **Number**: position in the register
-- **Policy, Summary and Subjects**: the policy title, a short summary, its category or tags, and how many rules and documents it is linked to
-- **Standing**: Draft, Review, Approved, Published, or Archived
+- **Policy**: the policy title, a short summary, its category or tags, and how many rules and documents it is linked to
+- **Status**: Draft, Review, Approved, Published, or Archived
 - **Last edited**: the most recent edit date
 
 Pinned policies appear at the top of the list and are marked with a subtle stripe.
 
 ### Filters
 
-Click **Filters** to scope the register. A line above the list says how many policies are showing.
+Click the filter icon at the right end of the search field to open **Views & filters**. A line above the list says how many policies are showing. Save the search and filters you use often under **Saved views**.
 
-- **Standing**: All, Drafts, In Review, Approved, Published, or Archived, each with a count
-- **Subject**: one category at a time, each with a count
+- **Standing**: Drafts, In Review, Approved, Published, or Archived, each with a count. Choose one or more; none chosen shows them all.
+- **Subject**: one or more categories, each with a count
 - **Demo data**: a toggle that hides seeded demo policies so you only see real institutional records. The same setting applies on Projects and Curriculum.
 
 ### Required by your agencies
@@ -66,13 +66,13 @@ If your college has the Academic Operations module, the college's academic polic
 
 ### Review Calendar rail (desktop)
 
-On wide screens, a **Review Calendar** rail sits beside the register. It lists overdue and upcoming review deadlines and keeps them in view while you browse. It is collapsed by default and opens on its own when it holds something new. A switch in the rail also shows the full list of policies required by your agencies.
+On wide screens, a **Review Calendar** rail sits beside the register. It lists overdue and upcoming review deadlines and keeps them in view while you browse. A policy due because a standard it answers changed sits with the overdue items and reads **Review**. Fold the rail away with the calendar button in the toolbar, and click it again to bring it back. It opens on its own when it holds something new. A switch in the rail also shows the full list of policies required by your agencies.
 
 ## What you can do here
 
 - **Open a policy**: click a row title to open the policy detail page
 - **Create a policy**: click **New Policy**. Enter a policy code, category, title, summary, and content, then click **Create Policy**
-- **Import policies**: click **Import**. See [Import policies from a manual](#import-policies-from-a-manual) below
+- **Import policies**: from **Actions**, choose **Import**. See [Import policies from a manual](#import-policies-from-a-manual) below
 - **Edit a policy**: from the row menu, choose **Edit**
 - **View history**: from the row menu, choose **View History** to see every change and revision
 - **Pin or unpin**: from the row menu, choose **Pin Policy** or **Unpin Policy** to keep key policies at the top of the list
@@ -90,7 +90,7 @@ Institutional admins, compliance officers, department heads, and anyone an admin
 
 <Steps>
   <Step title="Choose the files">
-    Click **Import**. Drag files into the dialog or click **Browse files**. Proof reads PDF, Word (`.docx`), Excel (`.xlsx`), CSV, plain text, and Markdown files.
+    From **Actions**, choose **Import**. Drag files into the dialog or click **Browse files**. Proof reads PDF, Word (`.docx`), Excel (`.xlsx`), CSV, plain text, and Markdown files.
   </Step>
   <Step title="Analyze">
     Click **Analyze Document** (or **Analyze N Documents**). Proof reads each file for regulatory bodies, rules, policies, accreditors, and standards.
@@ -144,6 +144,15 @@ When the review date has passed or a linked standard has changed, a **Review is 
 ### Review Standing rail (desktop)
 
 On wide screens, a side rail shows which linked standards need review, which are current, periodic review deadlines, and any linked standard sunset dates.
+
+### The policy's assistant
+
+When your college turns on the **Record assistant** on **Settings › Assistants**, the **p.** mark appears in the app's header on a policy's page, and the Review Standing rail folds into the assistant. Click the **p.** to open it:
+
+- **Needs you** lists what needs you on this policy, for example **No owner is named.** with **Name one**, a linked standard that changed with **Open the standard**, or **This policy is due for review.** with **Review it**. Under it is the policy's review standing, for example "Review standing · 2 of 3 current".
+- **Chat** answers questions about the policy from its own words. Each answer cites the passages it rests on; hover a marker to preview the passage, and the cited words are marked in the policy. An answer whose quote is not in the policy is not shown. Your conversation is kept, and **Your other conversations** lists your other threads.
+
+With the **Record assistant** off, there is no **p.** and the page keeps its Review Standing rail.
 
 ## Common tasks
 
