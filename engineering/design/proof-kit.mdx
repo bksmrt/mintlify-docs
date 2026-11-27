@@ -1,10 +1,10 @@
 ---
 title: "Proof Kit"
-description: "The editorial design system for painted illustration, semantic tokens, marks grammar, and the journal page idiom."
+description: "The editorial design system: semantic tokens, marks grammar, the page frame, the masthead medal, and the journal page idiom."
 sidebarTitle: "Proof Kit"
 ---
 
-Proof Kit is the product's editorial design system. It covers the painted watercolor-and-ink illustration style, the "review grammar" of marks and ornaments, semantic color tokens, and the Journal register page idiom. Real product screens adopt it incrementally, page by page, through the Antique Editorial conversion protocol.
+Proof Kit is the product's editorial design system. It covers the line-art illustration style, the "review grammar" of marks and ornaments, semantic color tokens, and the Journal register page idiom. Real product screens adopt it incrementally, page by page, through the Antique Editorial conversion protocol.
 
 ## Where things live
 
@@ -14,7 +14,11 @@ Proof Kit is the product's editorial design system. It covers the painted waterc
 | Marks grammar | `client/src/lib/proof/marks.ts` |
 | Mark component | `client/src/components/proof/Mark.tsx` + `Mark.css` |
 | Standard name component | `client/src/components/proof/StandardName.tsx` + `StandardName.css` |
-| Painted plate | `client/src/components/proof/PaintedPlate.tsx` |
+| Page frame (column or desk) | `client/src/lib/proof/page-frame.ts`, `client/src/components/proof/page-frame.tsx` |
+| Masthead medal | `shared/masthead-tier.ts`, read by `JournalPage` in `journal.tsx` |
+| Title-only page header | `client/src/components/proof/PageTitleHeader.tsx` |
+| Breadcrumb trail | `client/src/lib/trail.ts`, `client/src/components/header-trail.tsx` |
+| Register toolbar | `client/src/components/register/toolbar.tsx` (`RegisterToolbar`) |
 | Typography classes | `client/src/components/proof/typography.tsx` |
 | Ornaments | `client/src/components/proof/ornaments.tsx` |
 | Review grammar marks | `client/src/components/proof/marks.tsx` |
@@ -35,7 +39,7 @@ Proof Kit is the product's editorial design system. It covers the painted waterc
 
 ## Art direction
 
-The primary visual is fine hand-drawn navy line art on a paper or canvas ground. Watercolor is a small depth splash anchored behind the line art. It must never be a full-section wash. Large washes read as gradients and break the language. Dark conversion bands (CTA, footer) stay flat warm-dark with a small oak hairline rule as the only accent.
+The primary visual is fine hand-drawn line art on a paper ground. The watercolor art is gone (24 Nov 2026): the painted murals on Dashboard, Student Home, Workload Studio and Schedule of Classes, the blooms behind sprigs and vignettes, the colour wash and the landing's splash. `MuralPageHeader` became `PageTitleHeader`, title only. `scripts/__tests__/no-watercolor.test.ts` holds it. `PaintedPlate` and the painted posture art are deleted; posture art is the engraved `components/ethos/PosturePlate.tsx` and `PosturePair.tsx`. Dark conversion bands (CTA, footer) stay flat warm-dark with a small oak hairline rule as the only accent.
 
 Marginalia is a recurring, sparing device: margin notes, review-note callouts, footnote citations, and the Proof Note Mark (a looped-'p' loop plus jot stroke) as an inline gesture. The Note Mark is never a bullet or logo.
 
@@ -66,7 +70,19 @@ The primary button reads its own tokens (`--proof-cta-fill`, `--proof-cta-hover`
 
 Accent hues are brand-fixed across light and dark. Only `paper`, `surface`, `ink`, and `hair` flip in dark mode. Marks are always paired with text; never rely on color alone.
 
-Painted plates keep a light ground in both themes. `--proof-paper-base` (`#F2EADB`) never flips, so `PaintedPlate` uses `mix-blend-multiply` and keeps reading on dark backgrounds.
+`--proof-paper-base` (`#F2EADB`) never flips. Anything that multiplies onto paper paints on it, not on the theme-flipping `--proof-paper`.
+
+**Caution is umber.** Tailwind's `amber` and `yellow` are redefined in `tailwind.config.ts` as the umber scale (`UMBER`: 600 `#7D6252`, 700 `#5C4638`, 900 `#3F2F25`), so every amber note, bar, chip and banner reads the palette's *awaits someone*. The Evans navy outside the Evans chrome now reads the ink. Kept as intended: the medal colours on badges and seals, the academic pages' colours, and the gilt `--proof-gilt`.
+
+## The masthead medal
+
+On every page that opens with the large masthead, the college's latest certificate sets the medal (`shared/masthead-tier.ts`; `JournalPage` sets `--medal-hi`, `--medal-base`, `--medal-deep` and `data-medal`). The rule under the running head is drawn in the medal's still sheen, the running head opens with the brand's p. whose full stop is the medal's foil, and the title's thick strokes carry a medal hatch down their left edge. A college with no certificate, or a certificate under 70, reads as a pale ghost. It is the Proof Standard's medal, never Readiness's.
+
+## The page frame
+
+Every page is one of two frames (`lib/proof/page-frame.ts`): a **column**, centred at 1040px, or a **desk**, edge to edge with 24px margins, for pages that hold panes side by side (a project, the compliance workspace, Report Studio, Approvals, the Inbox, Certification Studio, and others listed in `DESK_ROUTES`). An open side panel widens the frame by its 300px and a 24px gap. A page sets no width of its own; `scripts/__tests__/page-frame.ratchet.test.ts` holds it, with an empty baseline.
+
+The header draws the one breadcrumb trail, led by a ← that goes one page up. The trail is read from the table in `lib/trail.ts`, never from the address, so every crumb is a page that exists and a record is named by its page, never its id. `scripts/__tests__/trail-census.test.ts` holds every route to a row, and `one-trail.test.ts` keeps any page from drawing a breadcrumb of its own. The shadcn `ui/breadcrumb.tsx` is deleted.
 
 ## Marks grammar
 
@@ -188,13 +204,14 @@ Adoption is incremental, page by page. Wave order: rails and docs first, then co
 ## Rules and gotchas
 
 - **Fonts are preloaded in `client/index.html`.** Do not add new font loading. The kit references them via `font-['…']` arbitrary classes.
-- **`--proof-paper-base` never flips.** Keep painted plates on it in both themes.
+- **`--proof-paper-base` never flips.** Anything multiplied onto paper paints on it.
+- **No watercolor.** No mural, bloom, wash or splash; `no-watercolor.test.ts` fails on one.
+- **No page width of its own.** Read the frame from `lib/proof/page-frame.ts`.
 - **The primary button reads the `--proof-cta-*` tokens**, never a hard-coded color, so it flips correctly in dark mode.
 - **No new seal shapes.** The concentric-ring seal is never drawn for a new mark, badge, tier, or score. The ICI's own foil seal stands.
 - **Any reusable SVG `id` derives from `useId()`.** Hardcoded ids break filters when a component renders twice.
 - **Badges are no-fill** (accent text + border over a 10% tint). Only CTAs and meters carry solid fills.
 - **Import from the barrel `@/components/proof`,** never deep paths.
-- **`components/ethos/*` stays untouched.** It is a separate system.
 - **Do not mix Evans and Proof tokens within one page.** Migrate the whole page, or keep it on Evans until ready.
 
 ## Related pages

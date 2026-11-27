@@ -86,6 +86,8 @@ Both jobs run on a PR's full suite (when it is marked ready) and only when it ch
 
 When you add a column a running database needs, teach `post-merge-prep.cjs` about it as well as editing `shared/schema.ts`.
 
+Database objects `drizzle-kit push` cannot make, such as triggers, live in one SQL file that both paths run. For example, `migrations/20261123_rx0_standing_history.sql` creates `project_status_moves`, `role_assignment_removals` and the triggers that fill them; `post-merge-prep.cjs` runs it on deploy, and `ensureStandingHistory()` (`server/standingHistory.ts`) runs the same file for a database built by `db:push` alone, as the tests' and CI's are.
+
 ### Row-level security policies
 
 The six tables that feed AI prompts (`documents`, `document_chunks`, `standards`, `policies`, `narrative_sections`, `evidence_slots`) declare a tenant row policy in `shared/schema.ts` (`tenantRowPolicy`). Each carries an indexed `institution_id`. See [Tenancy and auth](/engineering/foundations/tenancy-and-auth).

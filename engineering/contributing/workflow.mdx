@@ -48,6 +48,17 @@ A PR is marked ready only when the review pass is clean **and** no question you 
 - If the answer could not change the code, it is not a question: say it as a note and carry on.
 - The same holds for merging: green is the checks' answer, not the owner's.
 
+## Use what is decided
+
+Before building any piece (a component, a model call, a check, a look, a word), find what the app has already decided and built for it, and use that as it stands.
+
+- **Search first:** the contracts in `docs/design/` and their decided questions, the table in `CLAUDE.md`, then the code. A surface that already does the same job (the ⌘K box, the compliance workspace, Report Studio) is the first place to look.
+- **Name what you reuse** in the chat that starts the work. Where nothing fits, say so and ask.
+- **Where a decided piece doesn't quite fit**, use it unchanged and show the owner what doesn't fit. Don't fork, restyle, or patch around it.
+- **A second engine, table, prompt, or look beside one that exists is a defect.**
+
+For example, a Chat on a policy's assistant asks the reports engine with the policy as its source (`askReports` with `source: { kind: "policy" }`) and answers in the ⌘K box's `AskCard`, rather than a prompt, quote check, table, and citation look of its own.
+
 ## Redesign governance
 
 Redesign or reskin work on a surface is governed by that surface's completeness contract in `docs/design/`. Read the contract before touching the surface; `CLAUDE.md` indexes every contract with its fixture.
@@ -84,7 +95,7 @@ Most features move or show a score. Every contract states its score touch: which
 
 ## Asking the owner a question
 
-Draw the options; do not describe them. Each option is rendered as the UI it would produce, side by side, on the tenant's real data. Include today's behavior as an option, say which you would pick and why, and name what each option blocks. A question that waits on the owner's eye is pinned on its picture (`node scripts/pose-questions.mjs <spec.json> <out-dir>`), one question per picture.
+Draw the options; do not describe them. Each option is rendered as the UI it would produce, side by side, on the tenant's real data. Include today's behavior as an option, say which you would pick and why, and name what each option blocks. A question that waits on the owner's eye is pinned on its picture (`node scripts/pose-questions.mjs <spec.json> <out-dir>`), one question per picture. Send each picture on its own, as a close-up of the part it asks about at twice the size (a frame's `crop` with `scale: 2`), so it is readable in chat without zooming.
 
 Lead every presentation with a short practical example: a named person doing a real task on the tenant's data, what happens today, and what happens after the change.
 
@@ -100,5 +111,6 @@ These rules apply everywhere. A surface that seems to need a local override need
 - **Marks are canonical.** Every line under text, wash, tick, link glyph, or arrow follows `docs/design/visual-language.md` and is drawn by `<Mark>`.
 - **Decisions are canonical.** Every approve, send back, or decline follows `docs/design/approvals-one.md`: one decision card, one reason rule, one feed through the kind registry. See [Approvals framework](/engineering/foundations/approvals-framework).
 - **Pages are flat.** Large-masthead pages render `<JournalPage looseLeaf>`, straight on the desk. Record pages keep the sheet as a measure only, with no fill, hairline, or lift.
+- **One register, one frame, one trail.** Every register wears `RegisterToolbar`, and *Select* lives in each row's ⋯. Every page is a column or a desk from `lib/proof/page-frame.ts`. The header draws the only breadcrumb trail.
 - **A filter is never a tab bar.** A register's facets live in its Filters button, with `RegisterScope` saying what is showing. The tab ribbon is for leaves of a page only.
 - **The score family is canonical.** Readiness stays inside the college; anything comparative, external, or marketed is the Proof Standard. See [Score family and the ICI](/engineering/foundations/score-family).

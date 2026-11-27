@@ -61,6 +61,10 @@ The tone names are tokens, not literal colors: `oak` is now an umber (`#7D6252`)
 Three app-wide rules sit beside the marks:
 
 - **The register is light.** Every list renders through the one register component (`components/register/register.tsx`) in the custom report builder's light look: no box and no parchment band, small mono column heads over a hairline, solid hairlines between rows, the select bar in the selected rows' oak wash. `docs/design/register-canonical.md` defines the eight row slots and two densities and wins on any disagreement.
+- **One register, one toolbar.** Every register fills its page's column and uses `RegisterToolbar`: search, a view button only where a page has more than one layout, *Actions ▾*, and the one primary. Views and filters are one panel, opened by the filter mark at the search's right end. While that panel is open, a row's place and person slots fold into the line under its name.
+- **Select is a row's.** No register draws a Select button. *Select* is the first entry of each row's ⋯ and starts select mode with that row ticked; on a touch screen a 500ms press and hold does the same. *Done* rides the select bar. Held by `scripts/__tests__/register-select.test.ts`. A row with nothing to do draws no empty ⋯.
+- **Two page frames.** A page is a centred 1040px column or an edge-to-edge desk, read from `lib/proof/page-frame.ts`. See [Proof Kit](/engineering/design/proof-kit#the-page-frame).
+- **One breadcrumb trail, in the header.** No page draws a breadcrumb or a hand-written way back of its own.
 - **Pages are flat.** Large-masthead pages render `<JournalPage looseLeaf>`, straight on the desk. A record page's sheet is a measure only, with no fill, hairline, lift, or texture; a card is set apart by its hairline, never a lighter fill.
 - **A filter is never a tab bar.** A register's facets live in its Filters button, and `RegisterScope` (`components/proof/register-scope.tsx`) says in one line what is showing. The tab ribbon (`lib/proof/tabs.ts`) is for leaves of a page only. Held by `scripts/__tests__/register-scope.test.ts`.
 

@@ -60,10 +60,11 @@ A ratchet reads a committed baseline and fails if the metric gets worse. Most fa
 | `history-writes.ratchet.test.ts` | `history-writes.baseline.json` | History rows on destructive operations |
 | `single-role-checks.ratchet.test.ts` | `single-role-checks.baseline.json` | Role checks that read one role instead of all of a user's roles |
 | `swallowed-errors.ratchet.test.ts` | `swallowed-errors.baseline.json` | Empty `catch` blocks and stand-in `.catch()` values; route real failures through `server/bestEffort.ts` |
+| `page-frame.ratchet.test.ts` | `page-frame.baseline.json` | Pages that set a width of their own instead of reading `lib/proof/page-frame.ts` (empty baseline) |
 
 The test ratchets live in `scripts/__tests__/` with their baselines beside them. Lower the TypeScript baseline with `npm run check:tsc-ratchet -- --update`. A run that does not finish (for example, out of memory) fails the step and is never written as a baseline. `npm run check` prints the full TypeScript error list.
 
-`scripts/__tests__/` also holds many single-rule guards, such as `module-census.test.ts` (every route and page classified by module), `report-address.test.ts` (report addresses come from the catalog), `journal-loose-leaf.test.ts`, `register-scope.test.ts`, `ci-minutes.test.ts`, `ci-docs-only.test.ts`, and `ci-light-checkout.test.ts`.
+`scripts/__tests__/` also holds many single-rule guards, such as `module-census.test.ts` (every route and page classified by module), `report-address.test.ts` (report addresses come from the catalog), `journal-loose-leaf.test.ts`, `register-scope.test.ts`, `ci-minutes.test.ts`, `ci-docs-only.test.ts`, `ci-light-checkout.test.ts`, `assistant-floor.test.ts` (every model feature classified), `trail-census.test.ts` and `one-trail.test.ts` (the breadcrumb trail), `register-select.test.ts`, and `no-watercolor.test.ts`.
 
 ## Check scripts
 

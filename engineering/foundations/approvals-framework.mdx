@@ -117,7 +117,7 @@ The kind registry in `server/approvals/kinds.ts` extends this to every decision 
 | `recall` | `recall/triage` | Committee recall |
 | `narrative_reconciliation` | `narrative-reconciliation/triage` | A firm's reconciliation proposal |
 | `project_attach` | `project-attach/triage` | Putting one project under another |
-| `compliance_exception` | `compliance-exceptions/triage` | Compliance rule exceptions |
+| `compliance_exception` | `compliance-exceptions/triage` | Compliance rule exceptions, including a federal statute that does not apply to the college until a day |
 | `ethos_department_exception` | `ethos-department-exceptions/triage` | A department's exception to an Ethos setting |
 | `ethos_project_exception` | `ethos-project-exceptions/triage` | A project's exception to an Ethos setting |
 | `narrative_suggestion` | `narrative-suggestions/triage` | Narrative suggestions |
@@ -125,6 +125,8 @@ The kind registry in `server/approvals/kinds.ts` extends this to every decision 
 | `cause_question` | `cause-question/triage` | Is a gap's cause resolved, asked before the gap closes |
 | `yes_check` | `yes-check/triage` | Another look: is the cause still resolved |
 | `objective_suggestion` | `strategic-plan/suggestion-triage` | A suggested strategic plan objective |
+
+A statute's exception (`isStatuteRule` in `shared/statute-rule.ts`) moves no points and must carry the day it ends; one without an end day can only be declined. While it stands the statute is off the Compliance calendar and the score, and when it lapses the college's statutes are reconciled again (`server/collegeStatutes.ts`).
 
 Kinds marked `chainOnly` (`risk_delay`, `cause_question`, `yes_check`) are questions asked of a person. They are listed only to their chain: the person asked, anyone answering in their place, and everyone previously asked.
 
@@ -142,8 +144,13 @@ Every path that makes a compliance project (the wizard, the regulatory desk, a p
 - **The reason rule**: ten characters or more are required to request changes or decline, and to approve anything that carries items not in line
 - **The decision card**: one shared component that shows the record's name, what it carries, whose move it is, the reason box, and the words
 - **The feed**: one list for the Approvals page and the Inbox's Approvals tab
+- **The opened row**: on Approvals, the Inbox's Approvals view and the firm-wide view, a decision opens under its row as the register's opened row (`components/approvals/opened-decision.tsx` over `RegisterOpenedPanel`), as the Review Desk's proposals do. Its history unfolds under it from *History*. The earlier index card is retired.
 
 Any new decision surface should use the same card, the same reason rule, and register itself in the kind registry.
+
+## Work held like an approval step
+
+The operators' catalog requirement checks borrow the approval step's lifecycle without being a kind in the registry (they are platform work, not a college's decision on a submission). Whoever opens a check holds it for 24 hours and may delegate it, is reminded two hours before it is due, and past due it escalates to every operator, any of whom may take it (`server/requirementCheckClaims.ts`, swept with the five-minute approval sweep). See [Catalog pipeline](/engineering/areas/catalog-pipeline#requirement-checks).
 
 ## Request changes and resubmission
 

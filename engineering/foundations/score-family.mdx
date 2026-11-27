@@ -66,7 +66,7 @@ These hold wherever a score is computed, shown, exported, or marketed:
 
 1. **Readiness stays inside the college.** It is never averaged across colleges, ranked, sealed, or sent outside without its configuration (`Ethos vN` or `Default weights`).
 2. **Anything comparative, external, or marketed is the Proof Standard**: seals, peer position, the firm's portfolio, public badges.
-3. **Every move made without work is marked** wherever Readiness is trended.
+3. **Every move made without work is marked** wherever Readiness is trended. Beside the *Method* and *Range* flags, a delivery that adds requirements to a college after its first delivery of that agency, or retires standards there, is marked on the `/ici` trend and the change summary with the flag *Catalog* (for example *22 CCNE requirements added*).
 4. **A control that moves a score says which**, where it is set.
 5. **Balanced is the standard.** The Balanced posture's weights equal `DEFAULT_ICI_WEIGHTS`, held by a test.
 
@@ -76,9 +76,13 @@ Every design contract states its score touch: which members it moves or shows, o
 
 `runWeeklyIciSnapshot` writes one row per college per ISO week to `institution_ici_snapshots`. `runTermCertificationRollover` reads a term's final week and writes `institution_term_certifications`, one row per college and term, idempotent on the term name. Each term is judged on its own; earlier certificates form the track record. Term boundaries come from `institution_term_config`.
 
+A standard the agency retired stays in the scores until the delivery reaches the college. If the college holds work on it, the copy is held live for that work and counts in Readiness only, out of the certificate's floor; the Proof Standard card's *Rests on* line names the held rows.
+
 A term certifies (`termCertifies` in `shared/ici-cadence.ts`) when its final week holds a Proof Standard **and** evidence has been requested on at least half the rows the college is held to (`CERTIFICATION_FLOOR = 0.5`). A row is a requirement (an active `standard_obligations` row), or a standard not yet broken into requirements, standing in as one row. The counts are stored as `requirement_rows` and `evidence_requested_rows` on both the snapshot and the certificate.
 
 The certificate's tier comes from `metalTierFromScore`: 90 and up Gold, 80 Silver, 70 Bronze, below 70 certified with no tier. A college's standing is one of `not_assessed`, `not_certified`, `no_certified_score`, or `certified`. Tiers and seals appear only on certified terms, never on Readiness or forecasts.
+
+Every large masthead wears the medal of the college's latest certificate (`shared/masthead-tier.ts`): the rule under the running head, the running head's full stop, and a hatch on the title's left edge. It is the Proof Standard's medal, never Readiness's. A college with no certificate, or one under 70, reads as a pale ghost, and an operator or firm view across several colleges carries no medal. It shows a score and moves nothing.
 
 ## The requirement-first read
 

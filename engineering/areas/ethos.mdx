@@ -54,7 +54,16 @@ A posture changes **Readiness only**, never the Proof Standard, a seal, or peer 
 
 ### Ethos configuration and the assistant
 
-`/ethos` is the landing: the recommended posture and why. `/ethos/configuration` lists every setting with its value, the college's adjustment behind the institutional admin's edit state, and an Exceptions column. The Ethos assistant (`POST /api/institution/ethos/assistant/ask`) reads the same settings the page shows (`settingsRead.ts`) and only proposes changes: a person fills them into the form and saves. A reply that states a figure the settings don't hold is not shown.
+`/ethos` is the landing: the recommended posture and why. `/ethos/configuration` lists every setting with its value, the college's adjustment behind the institutional admin's edit state, and an Exceptions column. The Ethos assistant (`POST /api/institution/ethos/assistant/ask`) reads the same settings the page shows (`settingsRead.ts`) and only proposes changes: a person fills them into the form and saves. A reply that states a figure the settings don't hold is not shown. Her conversation with it is kept per person and college (`ethos_assistant_messages`, `server/ethos/assistantThread.ts`), a turn only once answered.
+
+`server/ethos/postureImpact.ts` says what saving a posture would change against the posture in effect, each setting worded as the settings page words it; a setting the college adjusted itself is counted as held, not listed.
+
+### Settings outside governance
+
+Two college settings added in November 2026 move no score:
+
+- **EA41, `recognition.standingHalfLifeMonths`** (6 to 48 months). A person's standing in a role (`shared/standing.ts`, `server/standing.ts`) counts each completed task, on time 1 and late or undated ½, halving every half-life. The clock runs only while the person holds a role on an open project. The team-fit people match reads it.
+- **EA42, `tasks.dueDays`** (7 to 45 days; Balanced 14). Every task is born with a due date (`shared/task-due.ts`, `server/taskDue.ts`): a date the caller gives, else EA42's days after the later of its phase's start and its making. A task in a phase that has not started has no date until the phase opens.
 
 ## Binding vs default
 

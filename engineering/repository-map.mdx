@@ -36,6 +36,15 @@ The server is organized around an entrypoint, a very large route file, shared in
 | `server/rowScope.ts`, `server/rowScopeMiddleware.ts`, `server/rowSecurity.ts` | Row-level security: request scope, middleware, and boot-time role and policy setup |
 | `server/firmContext.ts`, `server/firmWriteBoundary.ts` | Firm membership resolution and the firm's default-deny write boundary |
 | `server/auditService.ts` | Audit ledger helpers |
+| `server/assistantGate.ts`, `server/firmAssistantGate.ts` | The one check an assistant's route asks before a model call: the person's own opt-out, then the college's switch (or, for the firm's portfolio answer, the firm's switch and each college's Reports assistant) |
+| `server/assistantConversations.ts` | A person's other conversations with the assistant (workspace walks, policy Chats, Ethos configuration), newest first |
+| `server/requirementChecks.ts`, `requirementCheckJob.ts`, `requirementCheckClaims.ts`, `requirementCheckLearning.ts` | Catalog requirement checks: recording a check, the nightly list, a check held like an approval step, and the learning report. See [Catalog pipeline](/engineering/areas/catalog-pipeline) |
+| `server/catalogBatchSample.ts`, `server/proposalReach.ts`, `server/catalogRequirementParts.ts` | The review desk's sampled batch approval, each staged proposal's reach across colleges, and a requirement's numbered parts |
+| `server/renumberingLines.ts`, `server/standardMove.ts`, `server/standardRetired.ts` | An agency's renumbering crosswalk, moving a college's work to the successor standard, and a retired standard held for its work |
+| `server/collegeStatutes.ts` | A college's federal statutes reconciled from its Institutional Profile |
+| `server/taskDue.ts` | Every task's due date at birth (`dueAtBirth`) and dating a phase's tasks when it opens |
+| `server/standing.ts`, `server/standingHistory.ts` | A person's standing in each role, and the triggers that record project status moves and removed roles |
+| `server/badgeMeasures.ts` | The measure of every award, read by the award check and the profile's *Within reach* |
 
 ### Server subdirectories
 
@@ -48,7 +57,7 @@ The server is organized around an entrypoint, a very large route file, shared in
 | `server/ethos/` | Ethos defaults, presets, resolver, consumers, settings read, adjustments, assistant, and routes |
 | `server/sso/` | WorkOS and OIDC SSO, domain verification, role evaluation, session revocation |
 | `server/webhooks/` | Outbound webhook emitter, signer, and delivery worker |
-| `server/parsers/` | Agency standards parsers and their registry |
+| `server/parsers/` | Agency standards parsers and their registry, plus the eCFR parser (`ecfr.ts`, registered for no agency yet) |
 | `server/validation/` | Course, program, and section validation, including `exemption-core.ts` |
 | `server/comments/` | The comment lock guard (a reply to a locked thread is refused) |
 | `server/seeds/`, `server/scripts/` | Agency seeds and server-side maintenance scripts |
@@ -76,7 +85,7 @@ Grouped by business domain. This is not every module; list the directory for the
 | `compliance-exceptions`, `validation-exemptions`, `recall`, `project-attach` | Approval kinds: compliance exceptions, validation exemptions, committee recall, attach requests |
 | `deliverables` | Engagement deliverables: manifest, completion resolver, artifact store |
 | `disclosure-processing` | Disclosure parsing and classification, and projects made from a disclosure |
-| `catalog-source-check`, `rule-page-check` | Catalog-against-source comparison and the cited rule-page check, staged for operator review |
+| `catalog-source-check`, `rule-page-check` | Catalog-against-source comparison and the cited rule-page check, staged for operator review; the meaning reading and the comparison of two readings; the eCFR API reader |
 | `regulatory-intelligence`, `regulatory-sync` | Agency classification and escalation; drift detection, actioning, and impact fan-out |
 | `import-primitives`, `onboarding` | The import's primitive extraction and setup baseline reading; per-agency onboarding consequences |
 | `integrations` | SIS connectors, field mapping, sync, conflict resolution, and writeback |
@@ -85,6 +94,7 @@ Grouped by business domain. This is not every module; list the directory for the
 | `public-catalog`, `marketing-seo` | Public catalog publishing and crawlable marketing pages |
 | `section-recommendations`, `room-match`, `meeting-pattern-match`, `student-match`, `teaching-match`, `teaching-metrics`, `workload-recommendations`, `constraint-engine`, `advisor-constraints` | Scheduling rankers, matching, workload advice, and the constraint primitive engine |
 | `tasks-projection` | The tasks ledger projected from compliance records |
+| `team-fit` | The people match for a project's roles, ranked from each person's project record |
 
 ### Workers and schedules
 
@@ -102,6 +112,7 @@ Queue workers run on pg-boss. Each schedule is a pg-boss cron whose default you 
 | `server/workers/controlHealthSchedule.ts`, `controlHealthSweep.ts` | Daily control health sweep (`CONTROL_HEALTH_CRON`, default 04:00) |
 | `server/workers/reportDeliverySchedule.ts` | Hourly scheduled-report delivery (`REPORT_DELIVERY_CRON`) |
 | `server/workers/peerSnapshotSchedule.ts` | Weekly peer aggregate snapshot (`PEER_SNAPSHOT_CRON`, default Monday 05:00) |
+| `server/workers/requirementCheckSchedule.ts` | Nightly requirement check list (`REQUIREMENT_CHECKS_CRON`, default 04:30 UTC), after the source sweep |
 | `server/schedulerService.ts` | The in-process hourly scheduler (source batches, freshness and catch-up sweeps) under a database lock |
 | `server/platformClocks.ts` | The operator desk's view of the clocks, with Run now and Pause |
 
@@ -122,6 +133,8 @@ Key conventions on the client side:
 - Every list renders through the one register component (`components/register/register.tsx`), following `docs/design/register-canonical.md`. Never hand-roll a list frame.
 - Marks (underlines, washes, glyphs) are drawn by `components/proof/Mark.tsx` from `lib/proof/marks.ts`. The ratchet `scripts/__tests__/vl-marks.ratchet.test.ts` counts hand-rolled marks and only lets the count fall.
 - The journal tab bar draws from `lib/proof/tabs.ts`; see [Visual language](/engineering/design/visual-language).
+- A page's width comes from `lib/proof/page-frame.ts`: a centred 1040px column, or a desk edge to edge with 24px margins. A page sets no width of its own (`scripts/__tests__/page-frame.ratchet.test.ts`).
+- The header draws the one breadcrumb trail, read from the route table in `lib/trail.ts`. Every route in `App.tsx` needs a row there (`scripts/__tests__/trail-census.test.ts`).
 
 ## Shared package
 
@@ -137,13 +150,19 @@ Other shared rule tables you will meet often:
 | `shared/ici-default-weights.ts`, `shared/ici-cadence.ts`, `shared/requirement-first.ts`, `shared/freshness-clocks.ts` | Score family rules |
 | `shared/pipeline-run.ts`, `shared/college-copies.ts` | The pipeline run ledger and the college's copies of standards |
 | `shared/workspace-href.ts` | The one builder of compliance workspace addresses |
+| `shared/assistant-floor.ts` | Every model feature classified once: an assistant (and its switch), a reader, intake, a summary, an operator feature, or an index |
+| `shared/requirement-checks.ts`, `shared/check-learning.ts` | The requirement check rule (signals, weights, sample) and the Requirement scorecard |
+| `shared/renumbering.ts`, `shared/source-role.ts`, `shared/proposal-reach.ts` | Renumbering lines, a source's role (`standards` or `guidance`), and a proposal's reach |
+| `shared/statute-applies.ts`, `shared/statute-rule.ts` | Which federal statutes apply to a college, and why |
+| `shared/task-due.ts`, `shared/standing.ts` | A task's due date rule (Ethos EA42) and standing in a role (Ethos EA41) |
+| `shared/masthead-tier.ts` | The medal a college's large mastheads wear, from its latest certificate |
 
 ## Repo docs
 
 | File / directory | When to read it |
 | --- | --- |
 | `docs/areas/*.md` | Per-domain maps: core and shared, curriculum, sections, teaching, instructional standards, suggestions cockpits, integrations and retrieval, Ethos, the Proof kit, the antique-editorial conversion, the mockup sandbox, the task resolution map |
-| `docs/design/*.md` | Completeness contracts and maps for each redesigned surface, plus the app-wide rules (`register-canonical.md`, `visual-language.md`, `approvals-one.md`, `score-family.md`) |
+| `docs/design/*.md` | Completeness contracts and maps for each redesigned surface, plus the app-wide rules (`register-canonical.md`, `visual-language.md`, `approvals-one.md`, `score-family.md`, `page-frame.md`, `breadcrumbs.md`, `one-register.md`) |
 | `docs/bksmrt-write-policy.md` | The operator role's three-bucket write policy |
 | `docs/schema-migrations.md` | How schema changes are made, deployed, and recovered |
 | `docs/tenant-row-security.md`, `docs/ai-tenant-isolation.md` | Row-level security and what each model call can see |
