@@ -1,10 +1,10 @@
 ---
 title: "Documents"
-description: "Manage your institution's policies, handbooks, and templates in a working register with status tracking, tagging, and version history."
+description: "Manage your institution's handbooks, templates, letters, and other records in a working register with import, revisions, standing, and tagging."
 sidebarTitle: "Documents"
 ---
 
-The **Documents** page is your institution's working register of policies, handbooks, templates, and other compliance records. Compliance officers, accreditation liaisons, and institutional admins use it to draft, revise, approve, and archive the documents that support accreditation projects and regulatory compliance.
+The **Documents** page is your institution's working register of handbooks, templates, agency letters, and other compliance records. It works like the [Policy Inventory](/user-guide/compliance/policy-inventory): the same import, the same standing review, revisions, and archive. The difference is the type of record. A policy is a rule your college holds itself to. A document is a file kept whole, such as a handbook, a report, or a letter from an agency.
 
 ## How to get there
 
@@ -12,57 +12,113 @@ Click **Documents** in the main sidebar.
 
 ## What you see
 
-The page opens as a journal-styled register with the following sections.
+The page opens as a journal register.
 
-### Search and filters
+### Toolbar
 
-- A search bar labeled **Consult the register…** filters records by title.
-- **Subject filters** show the most common tags used across your institution's documents. Click a tag to filter the list. The active filters appear as chips.
-- A **Standing** facet lets you narrow the list by status.
+- A search field, **Search the register**, filters records by title. The filter icon at its right end opens **Views & filters**.
+- The calendar button opens and closes the **Review Calendar** rail, for compliance roles on wide screens.
+- **Actions**: **Enter a record** adds a record by hand. Shown to those who may edit documents.
+- **Import**: import files. Shown to those who may edit documents.
 
-### Status tabs
+### Filters
 
-The register is organized by standing. Each tab shows a count:
+Click the filter icon at the right end of the search field to open **Views & filters**. A line above the list says how many records are showing. Save the search and filters you use often under **Saved views**.
 
-- **All**: every record in the register.
-- **Drafts**: records still being written or revised.
-- **In Review**: records submitted for internal review.
-- **Approved**: records that have passed review but are not yet published.
-- **Published**: active, institution-facing records.
-- **Archived**: inactive records kept for reference.
+- **Standing**: Drafts, In Review, Approved, Published, or Archived, each with a count. Choose one or more; none chosen shows them all.
+- **Subject**: one or more of the tags your institution uses
+
+### Imported documents waiting for confirmation
+
+When an import has kept files whose text states a status or revision date, and nobody has confirmed it yet, a line appears over the register:
+
+> 2 imported documents state a standing nobody has confirmed. Until then they are Drafts.
+
+- Click **Review** to open the standing review for those documents.
+- Click **Confirm** to accept what each file states. You confirm once more in a dialog.
+
+Each waiting row also says what its file stated, for example "The file says Approved, revised Jun 14, 2024", with its own **Confirm**.
 
 ### Register list
 
 Each row shows:
 
-- A row number and the record title.
-- **Subjects** (tags) assigned to the record.
-- A provenance line showing whether the document is cited as evidence in reviews and how many other records it is linked to.
-- **Standing** label with a color tone.
-- **Filed** date, **Edited** date, and edition number.
-- A **Pin** action to bookmark the record to the top of your personal view.
+- A row number and the record title
+- **Subjects** (tags) assigned to the record
+- A provenance line showing whether the document is cited as evidence in reviews and how many other records it is linked to
+- **Standing** label with a color tone
+- **Filed** date, **Edited** date, and revision number (for example **rev. 3**)
 
-### Pagination
+Pinned records appear at the top. The register shows 25 records per page; use the pager at the bottom to move between pages.
 
-The register shows 25 records per page. Use the pager at the bottom to move between pages.
+### Review Calendar rail (compliance roles only)
 
-### Review Calendar context rail (compliance roles only)
+If your role is **Institutional Admin** or **Compliance Officer**, a **Review Calendar** rail sits beside the register on wide screens. It shows upcoming policy reviews, rule deadlines, and disclosure dates, and opens on its own when it holds something new. The calendar button in the toolbar folds it away and brings it back.
 
-If your role is **Institutional Admin** or **Compliance Officer**, a collapsible **Review Calendar** rail appears on the right. It surfaces upcoming policy reviews, rule deadlines, and disclosure dates for quick context while you work in Documents.
+## Import documents
+
+<Steps>
+  <Step title="Choose the files">
+    Click **Import**. Drag files into the dialog or click **Browse files**. Proof reads PDF, Word (`.docx`), Excel (`.xlsx`), CSV, plain text, and Markdown files.
+  </Step>
+  <Step title="Analyze">
+    Click **Analyze Document** (or **Analyze N Documents**).
+  </Step>
+  <Step title="Review what was found">
+    Each file is kept whole as one document under its own title, ticked for import. Anything else Proof finds in it, such as policies or rules, is offered below, unticked. Tick what you want; anything you import from a file is linked to its document. Click **Import N Items**.
+  </Step>
+  <Step title="Confirm each document's standing">
+    The import ends on a review of the documents it kept. Each is saved as a Draft, with the status and last-revised date its file states. Edit any row in place, then click **Confirm**, or close the dialog and confirm later from the register.
+  </Step>
+</Steps>
+
+<Note>
+Policies › **Import** keeps each file as a document too, beside the policies it reads from it. Each policy names its document as its source.
+</Note>
 
 ## What you can do here
 
-- **Create a new record**: click **Enter a Record** to add a new document directly in the register.
-- **View a record**: open the document detail page to read content, see compliance mappings, and review history.
-- **Edit a record**: if your role allows, open a record in edit mode to change its title, standing, content, subjects, or owning department.
-- **Edit tags inline**: quickly add or remove tags on a record without opening the detail page.
-- **Pin records**: bookmark frequently used records so they always appear at the top of the register.
+- **Create a new record**: from **Actions**, choose **Enter a record** to add a record directly in the register. Words you enter by hand are searchable, as an uploaded file's are.
+- **View a record**: open the record's detail page.
+- **Edit a record**: choose **Edit** from the row menu to change its title, standing, owning office, subjects, or content. An edit that changes the words saves a new revision.
+- **Edit tags inline**: choose **Edit Tags** to add or remove subjects without opening the detail page.
+- **View history**: choose **View History** to see every change.
+- **Pin records**: choose **Pin to top** so a record always appears at the top of your view.
 - **Download a record**: save the record's content as a plain text file.
-- **Share a record**: copy a deep link to the record onto your clipboard.
-- **Archive or restore**: move a record to **Archived** to remove it from active lists, or restore an archived record back to **Drafts**.
-- **Delete a record**: permanently remove a record. The confirmation dialog offers **Archive instead** as a safer, reversible choice.
-- **Select multiple records**: turn on selection mode to choose several records at once, then export them as a CSV, archive them in bulk, or delete them together.
-- **Import from cloud storage**: cloud import is not on this page. Use **Import from cloud** on a project's **Evidence** tab instead. See [Add evidence and match it to standards](/user-guide/accreditation/how-to/add-and-match-evidence).
+- **Share a record**: copy a link to the record onto your clipboard.
+- **Archive or restore**: choose **Archive** to move a record out of active lists. Its links are kept. While it is archived, a rule's or a project's evidence leaves it out. Choose **Restore to drafts** to bring it back with its links.
+- **Delete a record**: permanently remove a record. The confirmation offers **Archive instead** as a safer, reversible choice.
+- **Select multiple records**: choose **Select** from a row's **⋯** menu, tick the other records, then **Export** them as a CSV, **Archive** them, or **Delete** them together.
+
+<Note>
+Institutional admins, compliance officers, department heads, and anyone an admin has granted policy editing can create, import, edit, archive, and delete documents. Anyone else reads them.
+</Note>
+
+## Document detail page
+
+The byline shows who entered the record, its owning office, and when it was updated. **Edit** opens the record in place; **Save** keeps a new revision and **Cancel** discards your changes.
+
+The tabs are:
+
+- **Content**: the record's words
+- **Compliance**: the document read against the standards it cites. If it cites none, choose the standards to read it against. For an agency letter, **From this letter** lists the letter's findings, and **Owed by this letter** lists the response the letter asks for, with its due date. See [Respond to an agency letter's deadline](#respond-to-an-agency-letters-deadline).
+- **Related**: the policies, rules and standards, projects, and narratives that link to the record, including any policy read from it
+- **History**: every change. Use **Compare against an earlier state** to compare the current words with an earlier revision.
+
+### Respond to an agency letter's deadline
+
+When a letter asks for a response by a date, **Owed by this letter** shows the date as Proof read it, "not yet confirmed". Compliance officers and institutional admins act on it:
+
+- **Confirm**: the date is right. Click **Not this date…** to correct it first.
+- **Mark sent…**: record the day the response went to the agency, and link what was sent.
+- **Extended by the agency…**: record a new date the agency granted.
+- **Allow a delay…**: record why the college allows itself more time. A delay allowed by the college counts in Readiness only; the Proof Standard reads the response as late.
+
+Once sent, the line says when, links what was sent, and reads **on time** or how many days late.
+
+## Import from cloud storage
+
+Cloud import is not on this page. Use **Import from cloud** on a project's **Evidence** tab instead. See [Add evidence and match it to standards](/user-guide/accreditation/how-to/add-and-match-evidence). The **Demo Cloud Drive** is not offered on the live site.
 
 ## Common tasks
 
@@ -86,6 +142,7 @@ If your role is **Institutional Admin** or **Compliance Officer**, a collapsible
 
 ## Related
 
+- [Policy Inventory](/user-guide/compliance/policy-inventory)
 - [Projects](/user-guide/accreditation/projects)
 - [Compliance Workspace](/user-guide/accreditation/compliance-workspace)
 - [Self-Study](/user-guide/accreditation/self-study)

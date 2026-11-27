@@ -25,12 +25,15 @@ Proof is a multi-tenant compliance and accreditation platform for higher educati
 
 ## Before you start
 
-Integration configuration is done inside the Proof web app, not through a public API or command line tool. To manage integrations, you must sign in as a user with administrative authority for your institution.
+You configure integrations inside the Proof web app, not through a public API or command-line tool. Most of it lives in **Settings**, which shows the **Integrations** and **Webhooks** tabs to members of an institution.
 
-The routes for integrations, SSO, and webhooks enforce the following admin roles:
+Who can do what:
 
-- **SSO and webhooks**: available to `institutional_admin` users
-- **SIS integrations and cloud storage**: available to `institutional_admin` users, and some actions (such as importing into an engagement) also allow firm consultants who have been granted access to that specific engagement
-- **Disconnecting a storage account**: restricted to `institutional_admin`
+| Integration | Who manages it |
+| --- | --- |
+| **Webhooks** (**Settings › Webhooks**) | `institutional_admin` |
+| **SIS feed** (**Settings › Integrations**, **Student records**) | `institutional_admin` manages it. A `compliance_officer` can read it, and manage it once an admin grants SIS management on the **Users** page. |
+| **Cloud storage** (**Settings › Integrations**, **Storage**, and **Import from cloud** in a project's evidence tab) | Any member can connect an account and import from the evidence tab. Only an `institutional_admin`, or a firm consultant on an engagement at the institution, can disconnect one. |
+| **Single sign-on** | Set up with your Proof operator, who manages the connection from the operator console. See [SSO overview](/sso/overview). |
 
-If you do not see the Integrations, SSO, or Webhooks sections in the admin sidebar, contact an existing institutional administrator at your organization to assign you the `institutional_admin` role.
+If you do not see the tab you need, ask an existing institutional administrator at your organization to assign you the `institutional_admin` role.

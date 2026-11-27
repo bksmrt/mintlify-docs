@@ -1,78 +1,116 @@
 ---
 title: "Contributing workflow"
-description: "How to open a PR, the redesign governance model, and the canonical rules that keep the codebase consistent."
+description: "How to open and land a PR, the review loop, redesign governance, and the canonical rules that keep the codebase consistent."
 ---
 
-This page covers the conventions you follow when contributing to Proof: branch and PR discipline, how redesign work is governed, how to ask the owner a question, and the app-wide canonical rules (marks, decisions, registers) that every surface must obey.
+This page covers the conventions you follow when contributing to Proof: PR discipline, the review loop, how redesign work is governed, how to ask the owner a question, and the app-wide canonical rules every surface obeys. For what CI runs at each step, see [Testing and CI](/engineering/contributing/testing-and-ci).
 
-## Branch and PR conventions
+## Pull requests open as drafts
 
-Every pull request opens as a draft and is marked ready once, when the work is actually done. This policy exists to reduce CI minutes: October averaged 7.7 CI runs per merged PR, most of them pushes made while a session iterated.
+Every pull request opens as a draft and is marked ready once, when the work is done. Marking ready is what starts the full suite (roughly 30 to 40 minutes of CI), so it should happen once per PR.
 
-- **On a draft**, the `unit-tests.yml` workflow runs only the quick checks: dependency install, `npm audit`, agency-catalog drift check, and the TypeScript ratchet. The server and client test suites, the build, and the three database jobs are skipped.
-- **Mark the PR ready** before asking for review or before any "ready to merge" statement. That triggers the full suite exactly once. After that, pushes to the ready PR rerun the full suite.
-- **Convert back to draft** only for a long rework. That cancels any full run still in flight and returns to quick-check mode.
+- **While it's a draft**, each push runs only the quick checks. Run the suites you touched locally before each push.
+- **Mark it ready** before asking the owner to review it and before any "ready to merge". That starts the full suite once.
+- **More fixes after ready?** Push them. Each push runs the quick checks only, and the merge to `main` runs the full suite on what ships.
+- **Need the full suite on a ready PR without a push?** Convert it to draft, then mark it ready again.
+- **Need the full suite on every push while you rework?** Add the `ci:full` label and remove it when done.
+- **A docs-only PR** (every changed file ends in `.md`) runs the quick checks plus `npm run check:docs-tests`, never the suites.
 
-Run the suites you changed locally while iterating. The merge to `main` runs the full suite again on what actually ships.
+From a Claude session, where GraphQL is unavailable, use the REST endpoints:
+
+```bash
+gh api repos/bksmrt/EduComply/pulls -F draft=true -f title=… -f head=… -f base=main -F body=@…
+gh api -X POST repos/bksmrt/EduComply/pulls/<n>/ccr/ready_for_review
+gh api -X POST repos/bksmrt/EduComply/pulls/<n>/ccr/convert_to_draft
+gh api -X POST repos/bksmrt/EduComply/issues/<n>/labels -f 'labels[]=ci:full'
+```
+
+Contract records, register entries, and approval pictures ride in the same commit as the work they belong to. A docs-only push of its own restarts CI on code that has not changed.
+
+## The review loop
+
+Code review runs while the PR is a draft.
+
+1. Ask for review with an `@codex review` comment.
+2. When the review returns findings, convert the PR back to draft if a full run is in flight, so it is cancelled.
+3. Verify each finding against the code. Fix it test-first, or record on the surface's contract why not.
+4. Push, ask for review again, and repeat until a pass is clean.
+5. Mark the PR ready once.
+
+When Codex is at its usage limit, Claude's own code review stands in (`/code-review high <n>`), with the same loop. A finding from either reviewer is a claim to verify, not an order.
+
+### Ready waits for the owner's answer
+
+A PR is marked ready only when the review pass is clean **and** no question you put to the owner about that PR is still unanswered. An answer that changes code makes the full run waste and owes a second one.
+
+- An open question keeps the PR a draft. Say in the thread what you are waiting for and the reply that releases it.
+- A standing instruction ("merge each when green") does not answer a question raised after it.
+- If the answer could not change the code, it is not a question: say it as a note and carry on.
+- The same holds for merging: green is the checks' answer, not the owner's.
+
+## Use what is decided
+
+Before building any piece (a component, a model call, a check, a look, a word), find what the app has already decided and built for it, and use that as it stands.
+
+- **Search first:** the contracts in `docs/design/` and their decided questions, the table in `CLAUDE.md`, then the code. A surface that already does the same job (the ⌘K box, the compliance workspace, Report Studio) is the first place to look.
+- **Name what you reuse** in the chat that starts the work. Where nothing fits, say so and ask.
+- **Where a decided piece doesn't quite fit**, use it unchanged and show the owner what doesn't fit. Don't fork, restyle, or patch around it.
+- **A second engine, table, prompt, or look beside one that exists is a defect.**
+
+For example, a Chat on a policy's assistant asks the reports engine with the policy as its source (`askReports` with `source: { kind: "policy" }`) and answers in the ⌘K box's `AskCard`, rather than a prompt, quote check, table, and citation look of its own.
 
 ## Redesign governance
 
-Redesign or reskin work on any surface is governed by that surface's completeness contract. Read the contract before touching the surface. The contracts live in `docs/design/` and follow a standard structure: numbered rows with live contents and proposed dispositions, an idiom census, a defect index, open questions, and a slice sketch.
-
-### The completeness contract is the definition of done
-
-The mocks are a style reference and are partial. The contract's row inventory is complete. A redesign PR must include:
-
-1. **Contract-coverage rows** it completes.
-2. **Mock-vs-shipped screenshot pairs** rendered with the harness (`client/fixtures/` + `scripts/reskin-shot.mjs`).
-3. **Owner visual approval** before merge. Green CI alone is never sufficient.
+Redesign or reskin work on a surface is governed by that surface's completeness contract in `docs/design/`. Read the contract before touching the surface; `CLAUDE.md` indexes every contract with its fixture.
 
 ### Fixture before mock
 
-Mount the real page over the stub with a seeded, realistic world. Lifecycle variants switch by query param (`?state=…`). Serve envelope-shaped endpoints with their real shapes so the fixture does not crash or loop when a route is missing.
+A fixture mounts the real page over `client/fixtures/stub.ts` with a seeded, realistic world in the tenant's own vocabulary. Lifecycle variants switch by query parameter (`?state=…`). Serve endpoints with their real response shapes, because a `[]` fallback on the wrong route crashes or loops the page. `scripts/reskin-shot.mjs` renders fixture states to images.
 
-### Annotated atlas
+### The annotated atlas
 
-The initial map of any surface is delivered as an annotated atlas: renders of the UI itself with callout overlays pinned to each row's element. The atlas artifact includes a per-shot legend and an honesty list of every row not visible on any shot. The map stays complete where the camera cannot reach.
+The first map of a surface (an existing page before its redesign, or a new page's first design) is an annotated atlas, not a document alone:
 
-### Asking questions about a surface
+1. **Inventory from the live code.** Write the contract in `docs/design/`: numbered rows with live contents and proposed dispositions, an idiom census, a defect index (recorded, not fixed), open questions, and a slice sketch.
+2. **Fixture.** Mount the real page with realistic data.
+3. **Callout overlay.** A fixture-only module (`?callouts=1`) pins each row's number onto its element in magenta, a color no product palette uses.
+4. **Render every reachable state**: tabs, menus, dialogs, sheets, scripted rather than hand-driven.
+5. **Publish the atlas**: annotated shots with a legend per shot, and an honesty list of every row not visible on any shot, with the reason.
 
-When you need the owner to decide between options, draw the options; do not describe them. Each option is rendered as the UI it would produce, side by side, using the tenant's real data. Include the current behavior as an option, say which you would pick and why, and name what each option blocks so the owner sees the cost of deferring.
+Rendering is a diagnostic, not a proof. Verify statuses, predicates, and field shapes against the code as a separate step.
+
+### The definition of done
+
+The contract's row inventory, not the mock, is the definition of done. A redesign PR never merges without:
+
+1. The contract rows it completes.
+2. Mock-versus-shipped screenshot pairs rendered with the harness.
+3. The owner's visual approval. Green CI alone never merges a redesign PR.
+
+Management functions hide behind the permissions-gated edit state.
+
+### Score touch
+
+Most features move or show a score. Every contract states its score touch: which members of the score family it moves or shows, or *none*. See [Score family and the ICI](/engineering/foundations/score-family).
+
+## Asking the owner a question
+
+Draw the options; do not describe them. Each option is rendered as the UI it would produce, side by side, on the tenant's real data. Include today's behavior as an option, say which you would pick and why, and name what each option blocks. A question that waits on the owner's eye is pinned on its picture (`node scripts/pose-questions.mjs <spec.json> <out-dir>`), one question per picture. Send each picture on its own, as a close-up of the part it asks about at twice the size (a frame's `crop` with `scale: 2`), so it is readable in chat without zooming.
+
+Lead every presentation with a short practical example: a named person doing a real task on the tenant's data, what happens today, and what happens after the change.
 
 ## The decisions register
 
-One standing register captures every open question and every question on it gets addressed meticulously. The register lives in a canonical artifact with fixed sections:
-
-- **Blocking now**: decisions the owner must make before work proceeds.
-- **In review**: work awaiting the owner's word at a gate.
-- **Answered, to build**: decided and recorded, not yet built.
-- **Deferred by owner**: parked by the owner's word, recorded so it survives.
-- **Decided**: a ledger of question, answer, and where the answer now lives (contract row, file, or issue).
-
-Capture every decision the moment it surfaces. Address one at a time to done: build it (fail-first), record it as a boundary, update the register, and reply to the thread. Republish the register on every state change.
-
-Visual approvals waiting on the owner live on the register too. Every ask carries its pictures in chat, captioned and pinned to the element being asked about. Never answer "sent earlier" or "see the PR body."
+One standing register artifact captures every open question, with fixed sections: Blocking now, In review (with "Waiting on your eye" first), Answered to build, Deferred, and Decided. The Decided ledger records the question, the owner's answer, and where the answer now lives (contract row, file, or issue). Capture each question when it surfaces, work it to done, and republish the register on every state change. Pictures waiting on the owner's eye live on the register and are re-sent in the chat that asks.
 
 ## Canonical app-wide rules
 
-These rules apply everywhere in the product. A surface that seems to need a local override needs a spec change instead.
+These rules apply everywhere. A surface that seems to need a local override needs a spec change instead.
 
-### Lists are canonical
-
-Any surface that lists records follows `docs/design/register-canonical.md`: one frame, one header band, eight fixed row slots, two densities. The per-surface contract says what content the rows carry; the register spec says how they look, and wins on disagreement.
-
-### Marks are canonical
-
-Any line drawn under text, wash, checkmark, link glyph, or arrow follows `docs/design/visual-language.md`. `client/src/lib/proof/marks.ts` is the table from meaning to look, and `components/proof/Mark.tsx` is the one element that draws it. Never hand-roll an underline, dotted border, or dashed line in CSS, inline styles, or Tailwind classes. The ratchet test `scripts/__tests__/vl-marks.ratchet.test.ts` counts hand-rolled marks per file and only allows the count to fall.
-
-### Decisions are canonical
-
-Any place a person approves, sends back, or declines what another person submitted follows `docs/design/approvals-one.md`: one reason rule, one decision card, and one feed that the Approvals page and the Inbox read through the kind registry. A new approval kind that is not a registry provider is a defect.
-
-### The large masthead draws on the desk
-
-Every page that opens with the journal's large masthead renders the masthead and the register straight on the desk, never inside the bound sheet. Record pages (a document, a person, a policy) keep the sheet, which carries its pinned ribbon.
-
-### A filter is never a tab bar
-
-A register's facets live in its Filters button. The ribbon is for leaves of a page only. The census and the rule are held by `scripts/__tests__/register-scope.test.ts`.
+- **Lists are canonical.** Every list follows `docs/design/register-canonical.md` and renders through the one register component, in the light look. See [Visual language](/engineering/design/visual-language).
+- **Marks are canonical.** Every line under text, wash, tick, link glyph, or arrow follows `docs/design/visual-language.md` and is drawn by `<Mark>`.
+- **Decisions are canonical.** Every approve, send back, or decline follows `docs/design/approvals-one.md`: one decision card, one reason rule, one feed through the kind registry. See [Approvals framework](/engineering/foundations/approvals-framework).
+- **Pages are flat.** Large-masthead pages render `<JournalPage looseLeaf>`, straight on the desk. Record pages keep the sheet as a measure only, with no fill, hairline, or lift.
+- **One register, one frame, one trail.** Every register wears `RegisterToolbar`, and *Select* lives in each row's ⋯. Every page is a column or a desk from `lib/proof/page-frame.ts`. The header draws the only breadcrumb trail.
+- **A filter is never a tab bar.** A register's facets live in its Filters button, with `RegisterScope` saying what is showing. The tab ribbon is for leaves of a page only.
+- **The score family is canonical.** Readiness stays inside the college; anything comparative, external, or marketed is the Proof Standard. See [Score family and the ICI](/engineering/foundations/score-family).

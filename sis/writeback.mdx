@@ -1,74 +1,44 @@
 ---
 title: "SIS writeback"
-description: "Send approved catalog changes from Proof back to your SIS."
+description: "How approved catalog changes can flow from Proof back to an SIS, and what that means for the CSV feed."
 sidebarTitle: "Writeback"
 ---
 
-SIS writeback lets you push approved catalog changes from Proof into your Student Information System. This is useful when your institution designs curriculum updates inside Proof (for example, a new course, a changed prerequisite, or a revised program requirement) and wants the final, approved version to flow back to the SIS rather than being re-entered by hand.
+SIS writeback sends approved catalog changes from Proof into an SIS, so a revised course or program does not have to be re-entered by hand.
 
 <Warning>
-  Writeback is a beta capability. It is available for API-based vendors (Ellucian Banner, Colleague, and Workday) but should be treated as limited and exploratory until validated against a live sandbox. The SFTP / CSV Drop connector does not support writeback.
+  Writeback runs only on vendor API connections (Ellucian Banner, Colleague, and Workday), and a college cannot connect those today. The SFTP / CSV Drop, the feed a college can connect, reads files and never writes back. If your college uses the CSV feed, update your SIS from the approved changes in Proof yourself.
 </Warning>
+
+The rest of this page describes how writeback behaves on a vendor connection where it is turned on.
 
 ## What writeback does
 
-Writeback updates existing SIS records only. It never creates new records in the SIS. The eligible entity types are:
+Writeback updates existing SIS records only. It never creates or deletes records in the SIS. When a project that changed the catalog is approved, Proof queues a writeback job for each of the institution's connections that have writeback turned on. These record types can be sent:
 
-- **Course** (for example, title, credits, subject, course number)
-- **Program** (for example, program title, credential type)
-- **Department** (for example, department name, code)
-- **Prerequisite** (course prerequisite relationships)
-- **Requirement group** (program requirement sets)
+| Record type | Fields sent |
+| --- | --- |
+| **Course** | Title, subject, course number, description, short description, credits, contact, lecture, lab and clinical hours, CIP code, fund code |
+| **Program** | Name, code, description, total credits, expected terms, CIP code |
+| **Prerequisite** | Link type, whether it is required, minimum grade, notes |
+| **Requirement group** | Name, description, requirement type, required credits, minimum and maximum courses, sequence order, recommended term |
 
-If a record does not already exist in the SIS, the writeback job marks it as failed with a clear reason.
+A record with no SIS key (one that did not come from the SIS) is not sent.
 
-## Prerequisites
+## Settings on a connection
 
-Before enabling writeback, confirm the following:
+Each connection has its own writeback settings, changed only by an institutional admin or a compliance officer granted SIS management:
 
-1. **Your SIS vendor supports writeback**: Banner, Colleague, and Workday have writeback adapters. SFTP / CSV Drop does not.
-2. **You have active API credentials**: The same credentials used for read syncs are used for writeback. If the read path works, the write path will attempt to use the same token or OAuth session.
-3. **Your institution uses a split ownership model**: Writeback is designed for institutions where Proof owns the next catalog year's draft and the SIS owns the published year. If your institution treats the SIS as the sole owner of all curriculum data, writeback should not be enabled.
+- **Master switch**: off by default. While off, the connection gets no writeback jobs.
+- **Writable record types**: none by default. Each type must be allowed explicitly.
+- **Schedule**: when queued jobs run: every 15 minutes (the default), hourly, daily, weekly, or off. When off, jobs wait until someone chooses **Run now** from the job's menu on the **Write-back jobs** page.
 
-## How to enable writeback
+## Safety
 
-<Steps>
-  <Step title="Open the connection settings">
-    Writeback runs on vendor API connections, which Proof manages for you. Contact Proof support to open the writeback configuration for your connection.
-  </Step>
-  <Step title="Turn on writeback">
-    Toggle the master switch to enable writeback for this connection.
-  </Step>
-  <Step title="Choose writable entities">
-    Select which entity types you want to allow for writeback. By default, no entities are enabled. You must explicitly opt in each one.
-  </Step>
-  <Step title="Set the schedule">
-    Choose when queued jobs should run. Options include every 15 minutes, hourly, daily, weekly, or off. When set to off, jobs wait in queue until someone clicks **Run now** on the job in **SIS Write-Back Jobs**.
-  </Step>
-  <Step title="Save and verify">
-    Save the configuration. You can trigger a manual writeback job from the connection panel to verify connectivity before relying on scheduled runs.
-  </Step>
-</Steps>
-
-## What fields go back
-
-Writeback sends the subset of fields that Proof manages and the vendor accepts. The exact payload depends on the entity type and the vendor adapter. In general:
-
-- Course updates include title, credits, subject, course number, and related department references.
-- Program updates include title and credential type.
-- Department updates include name and code.
-- Prerequisite and requirement-group updates include the structured relationships defined in Proof.
-
-Fields that Proof does not manage (for example, SIS-internal IDs or system timestamps) are never included in the payload.
-
-## Safety and approvals
-
-Writeback follows a conservative, review-first design:
-
-- **Advisory locks**: only one writeback job per connection can run at a time, preventing overlapping edits.
-- **Optimistic concurrency**: each write request includes the last known SIS value as an `If-Match` header. If the SIS record changed since the last read, the write is rejected as a conflict rather than overwriting the newer data.
-- **Idempotency**: every row carries a correlation ID, so retrying the same job does not duplicate writes.
-- **Approval-driven batches**: today, writeback can be triggered manually or on a schedule. In a future release, writeback will fire as a reviewed batch tied to a catalog-year publish event, rather than on every individual committee vote.
+- **One job at a time**: only one writeback job per connection runs at once.
+- **Optimistic concurrency**: each write carries the last SIS value Proof read, as `If-Match` where the vendor supports it. If the SIS record changed since then, the write is refused as a conflict instead of overwriting newer data.
+- **Idempotency**: every row carries a stable correlation ID, so approving the same project again does not queue the same writes twice.
+- **Deadline**: a job stops after 10 minutes.
 
 ## Writeback outcomes
 
@@ -76,41 +46,29 @@ Each row in a writeback job receives one of the following outcomes:
 
 | Outcome | Meaning |
 | --- | --- |
-| **Applied** | The SIS accepted the PATCH or PUT and updated the record |
+| **Applied** | The SIS accepted the write and updated the record |
 | **Skipped** | The record was unchanged or not eligible for writeback |
-| **Conflict** | The SIS rejected the write because the record changed on the SIS side since the last read (HTTP 409 or 412) |
-| **Failed** | The SIS returned an error (for example, 400, 401, 403, 404, or 5xx) or the network request failed |
+| **Conflict** | The SIS refused the write because the record changed there since the last read (HTTP 409 or 412) |
+| **Failed** | The SIS returned an error (for example, 400, 404, or 5xx) or the request failed |
 
-If a job encounters multiple auth failures (HTTP 401 or 403), Proof automatically pauses the connection and sets its status to authentication failing. An institutional admin must refresh the credentials and clear the pause before writeback resumes.
+An HTTP 401 or 403 pauses the connection: its status becomes authentication failing, and writeback stops until an institutional admin rotates the credentials and clears the pause.
 
 ## Rate limits and backoff
 
-If the SIS returns rate-limit responses (HTTP 429) or transient server errors, the writeback engine applies an adaptive per-connection backoff. The wait time doubles after each consecutive failure, up to a maximum of 60 seconds. Scheduled jobs respect this cooldown and are deferred rather than fired immediately.
+If the SIS returns rate-limit responses (HTTP 429) or transient server errors, the writeback engine backs off per connection. The wait doubles after each consecutive failure, up to 60 seconds.
 
-## Conflict resolution UI
+## Conflicts and jobs
 
-When a writeback row returns a conflict, it appears in **SIS Write-Back Conflict Queue**. An institutional admin or a compliance officer with the SIS management grant clicks **Resolve** on the row. The **Resolve write-back conflict** dialog shows **Catalog (proposed)**, **SIS (last known baseline)**, and **SIS (observed now)** side by side, then offers three choices:
+When a writeback row returns a conflict, it appears on the **Write-back conflicts** page, together with rows the SIS failed to take. An institutional admin, or a compliance officer with the SIS management grant, chooses **Resolve…** from the row's menu. The **Resolve write-back conflict** dialog shows **Catalog (proposed)**, **SIS (last known baseline)**, and **SIS (observed now)** side by side, then offers three choices:
 
 - **Local wins — apply catalog → SIS**: push the Proof value to the SIS
 - **Remote wins — pull SIS → catalog**: keep the SIS value and update Proof to match
 - **Merge — push a hand-curated value to SIS**: pick a side per field with **Use catalog** or **Use SIS**, or edit the value directly
 
-In **SIS Write-Back Jobs**, each job row also has **Retry** and **Skip** buttons.
+Every resolution needs a written reason of at least 15 characters. Under **Filters**, narrow the conflicts by **Connection** and **Type** (course, program, department, prerequisite, or requirement group), or search external keys and reasons.
 
-## Monitoring writeback jobs
+The **Write-back jobs** page lists each job with its trigger (project approval, manual, scheduled, or retry), its times, and its counts of applied, skipped, conflict, and failed rows. Under **Filters**, narrow the list by **Status** and **Connection**; you can pick several values in each, for example both **Failed** and **Partial**. Each job's menu offers **Details**, a queued job also offers **Run now**, and a failed or partial job **Retry**. Inside a job's details, each failed or pending row has its own **Retry** and **Skip** buttons; a skip asks for a reason.
 
-Open the writeback jobs list to see:
+## Turning writeback off
 
-- Job ID and trigger (manual, scheduled, retry, or project approval)
-- Connection and institution
-- Start and finish times
-- Counts for applied, skipped, conflict, and failed rows
-- Per-row details with error messages and SIS-side diagnostics
-
-<Note>
-  Writeback jobs run on the same worker pool as sync runs and share the same reliability guarantees (restart-safe queueing, bounded concurrency, and per-job deadlines). The default job deadline is 10 minutes.
-</Note>
-
-## Disconnecting and cleanup
-
-If you disable writeback or disconnect the integration, existing queued jobs remain in the queue but will not run until the connection is re-enabled. No data is deleted on the SIS side when you turn off writeback.
+If you turn writeback off or disconnect the integration, queued jobs stay queued but do not run. Nothing is deleted on the SIS side.

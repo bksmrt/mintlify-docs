@@ -1,0 +1,105 @@
+---
+title: "Score family and the ICI"
+description: "How the Institutional Compliance Index is computed: the six factors, Readiness versus the Proof Standard, weekly snapshots, term certification, and the requirement-first read."
+sidebarTitle: "Score family and ICI"
+---
+
+The Institutional Compliance Index (ICI) is the number most features eventually move. It is not one score but a family of five measures, each with its own role and place on screen. This page covers how the engine computes them, where they are stored, and the rules every feature that touches a score must follow.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Default factor weights | `shared/ici-default-weights.ts` (`DEFAULT_ICI_WEIGHTS`) |
+| Factor calculators | `server/modules/ici-engine/factors/*` |
+| Per-project calculation | `server/modules/ici-engine/ici-calculation.service.ts` |
+| The Proof Standard | `server/modules/ici-engine/proof-standard.ts` |
+| Concluded-project fade | `server/modules/ici-engine/concluded-decay.ts`, `reaffirmation-cycle.ts` |
+| Open gaps holding credit | `server/modules/ici-engine/open-gap-holds.ts` |
+| Weekly snapshot and term certification | `server/modules/ici-engine/ici-cadence.service.ts`, `shared/ici-cadence.ts` |
+| What a certificate rests on | `server/modules/ici-engine/certification-base.ts` |
+| Requirement-first read | `shared/requirement-first.ts`, `shared/freshness-clocks.ts`, `server/modules/ici-engine/requirement-first-read.ts`, `requirement-first-switch.ts` |
+| Method changes and the switch date | `shared/ethos-weight-changes.ts` (`ICI_METHOD_CHANGES`, `REQUIREMENT_FIRST_FROM`) |
+| Posture weights | `shared/ethos-ici.ts` |
+| Recompute queue | `server/workers/ici-recompute-worker.ts`, `iciRecomputeQueue.ts` |
+| Read routes | `server/iciCadenceRoutes.ts` (`/api/institution/ici-cadence`, `/api/institution/ici/details`, `/api/institution/ici/recompute`, `/api/institution/term-config`), `server/iciDecayRoutes.ts` (cycle readiness, lineage, supersession) |
+| The contract | `docs/design/score-family.md`, `docs/institutional-compliance-index-spec.md` |
+
+## The five members
+
+| Member | What it is | Where it appears |
+| --- | --- | --- |
+| **Readiness** | The college's roll-up under its own configuration (Ethos posture, adjustments, project overrides) | Dashboard, `/ici` |
+| **Proof Standard** | The same factors under fixed, published weights, stamped with a methodology version | `/ici`, certificates, anything comparative or external |
+| **Peer Position** | A percentile placement, ranked on the Proof Standard | `/benchmarking` only (Peer Benchmarking module) |
+| **Comparability** | A High / Moderate / Limited label with its coverage line, beside every peer result | Beside peer results |
+| **Exceptions** | An annotation on the score explanation and audit trail, never a number | Project card, audit trail |
+
+## The six factors
+
+Every scored project computes six factors. The defaults sum to one:
+
+| Factor | Default weight |
+| --- | --- |
+| `obligationCoverage` | 25% |
+| `evidenceCoverage` | 25% |
+| `policyFreshness` | 20% |
+| `executionTraceability` | 15% |
+| `governanceIntegrity` | 10% |
+| `controlRedundancy` | 5% |
+
+Never type a factor's share into a screen. Read it from `DEFAULT_ICI_WEIGHTS` (or `iciWeightPercent`).
+
+An open gap holds back its standard's obligation credit (`open-gap-holds.ts`). In Readiness every open gap holds. In the Proof Standard only a gap the agency named (`source = disclosure`) holds, so recording fewer self-identified gaps never improves the public number. An allowed delay does not lift the hold.
+
+## Readiness versus the Proof Standard
+
+Readiness is shaped by the college's Ethos: a posture's ICI weights come from `shared/ethos-ici.ts`, held between half and double each default and rebalanced to sum to one. The Proof Standard reads only the six stored factor scores under `DEFAULT_ICI_WEIGHTS`, so no configuration can buy a better public number.
+
+The Proof Standard carries a methodology version (`PROOF_STANDARD_VERSION` in `proof-standard.ts`). A methodology change mints a new version and never rewrites a stored row. Changes that move Readiness without work (an Ethos version, a method change) are listed in `ICI_METHOD_CHANGES` and marked on the trend.
+
+The two numbers can still differ at the Balanced posture: Readiness fades a concluded project toward its next review (`concluded-decay.ts`), while the Proof Standard counts it at its frozen factors.
+
+### Rules for every feature
+
+These hold wherever a score is computed, shown, exported, or marketed:
+
+1. **Readiness stays inside the college.** It is never averaged across colleges, ranked, sealed, or sent outside without its configuration (`Ethos vN` or `Default weights`).
+2. **Anything comparative, external, or marketed is the Proof Standard**: seals, peer position, the firm's portfolio, public badges.
+3. **Every move made without work is marked** wherever Readiness is trended. Beside the *Method* and *Range* flags, a delivery that adds requirements to a college after its first delivery of that agency, or retires standards there, is marked on the `/ici` trend and the change summary with the flag *Catalog* (for example *22 CCNE requirements added*).
+4. **A control that moves a score says which**, where it is set.
+5. **Balanced is the standard.** The Balanced posture's weights equal `DEFAULT_ICI_WEIGHTS`, held by a test.
+
+Every design contract states its score touch: which members it moves or shows, or none.
+
+## Weekly snapshots and term certification
+
+`runWeeklyIciSnapshot` writes one row per college per ISO week to `institution_ici_snapshots`. `runTermCertificationRollover` reads a term's final week and writes `institution_term_certifications`, one row per college and term, idempotent on the term name. Each term is judged on its own; earlier certificates form the track record. Term boundaries come from `institution_term_config`.
+
+A standard the agency retired stays in the scores until the delivery reaches the college. If the college holds work on it, the copy is held live for that work and counts in Readiness only, out of the certificate's floor; the Proof Standard card's *Rests on* line names the held rows.
+
+A term certifies (`termCertifies` in `shared/ici-cadence.ts`) when its final week holds a Proof Standard **and** evidence has been requested on at least half the rows the college is held to (`CERTIFICATION_FLOOR = 0.5`). A row is a requirement (an active `standard_obligations` row), or a standard not yet broken into requirements, standing in as one row. The counts are stored as `requirement_rows` and `evidence_requested_rows` on both the snapshot and the certificate.
+
+The certificate's tier comes from `metalTierFromScore`: 90 and up Gold, 80 Silver, 70 Bronze, below 70 certified with no tier. A college's standing is one of `not_assessed`, `not_certified`, `no_certified_score`, or `certified`. Tiers and seals appear only on certified terms, never on Readiness or forecasts.
+
+Every large masthead wears the medal of the college's latest certificate (`shared/masthead-tier.ts`): the rule under the running head, the running head's full stop, and a hatch on the title's left edge. It is the Proof Standard's medal, never Readiness's. A college with no certificate, or one under 70, reads as a pale ghost, and an operator or firm view across several colleges carries no medal. It shows a score and moves nothing.
+
+## The requirement-first read
+
+Today a college's number averages its projects. The requirement-first read scores every requirement the college holds, across every agency, whether or not a project contains it:
+
+- `shared/requirement-first.ts` reads each requirement on the same six factors: its confirmed owner (held back by an open gap), its evidence, its narrative, its freshness clocks, and how many records support it. A factor is the mean of its requirements, and every requirement counts the same; the read rolls up to standard, agency, and college.
+- `shared/freshness-clocks.ts` defines four clocks per requirement (`policyReview`, `evidenceRenewal`, `ownerReading`, `agencyWording`). Each reads whole until its due date, gives a 30-day notice, then falls to zero over 90 days. A clock counts only where something rests on the requirement. The Proof Standard counts nothing as current past three years without renewal and ignores the college's shelf-life setting.
+- `requirement-first-read.ts` gathers the facts from what the college stores, against a real database.
+
+The switch is dated by `REQUIREMENT_FIRST_FROM` in `shared/ethos-weight-changes.ts` (30 November 2026). From that moment `readsByRequirement(at)` is true, Readiness, its factors, its forecast and the Proof Standard read by requirement, and the Proof Standard's version becomes `REQUIREMENT_FIRST_VERSION`. In the week before, `/ici` and the dashboard show the number both ways. The operators' **Index, both ways** report (`shared/index-both-ways.ts`, `server/indexBothWays.ts`) compares the two reads for every college.
+
+<Note>
+  Correct the switch date in one place, `ICI_METHOD_CHANGES`. The notice, the trend's Method mark and the Proof Standard version all read it.
+</Note>
+
+## Related pages
+
+- [Ethos](/engineering/areas/ethos)
+- [Billing and modules](/engineering/foundations/billing-and-modules)
+- [Reporting](/engineering/areas/reporting)

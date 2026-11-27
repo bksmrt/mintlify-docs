@@ -1,9 +1,9 @@
 ---
 title: "Compliance workspace"
-description: "Work through each accreditation standard in a project: write the narrative, resolve issues, and attach evidence."
+description: "Work through each accreditation standard in a project: write the narrative, read it against the requirements, resolve issues, and attach evidence."
 ---
 
-The compliance workspace is where your team does the day-to-day work of an accreditation project. It lists the standards and compliance gaps for the project and opens each standard in an editor where you write the narrative, review flagged issues, and link evidence.
+The compliance workspace is where your team does the day-to-day work of an accreditation project. It lists the standards and compliance gaps for the project and opens each standard, where you write the narrative, read it against the agency's requirements, review flagged issues, and link evidence.
 
 To get there, open a project from [Projects](/user-guide/accreditation/projects), then choose **Compliance workspace** from the project's **Actions** menu.
 
@@ -11,59 +11,116 @@ To get there, open a project from [Projects](/user-guide/accreditation/projects)
 
 ### Header
 
-The header shows the project name and these controls:
+The header shows the project name, its status, and these controls:
 
+- **Read as**: switch between **Narrative** and **Standard**. See [Two ways to read a standard](#two-ways-to-read-a-standard).
 - **Self-Study Document**: opens the full [self-study document](/user-guide/accreditation/self-study) for the project.
 - **Actions** menu:
+  - **Read against the requirements**: reads every section against the standard's requirements again. Appears when you can decide readings.
   - **Packet**: opens the self-study packet for the project.
   - **Activity**: shows recent activity on the project.
   - **Scan evidence**: scans your documents for evidence across every standard. Appears when the project has compliance gaps.
-- Collaborator avatars show who else is working in the workspace right now. **Only you** means nobody else is active.
+- On a project shared with a consulting firm, collaborator avatars show who else is working in the workspace right now. **Only you** means nobody else is active.
+
+The project's [discussion](/user-guide/discussions) sits at the foot of the page.
+
+### Two ways to read a standard
+
+**Read as** switches the whole workspace between two views of the same work:
+
+- **Narrative** answers *what do we say?* The self-study's parts head the page, and each part lists its sections. At a part's foot, click **+ Add a section** or **Import a section from a file**. When the full narrative part is empty, click **Write it** or **Assemble from parts 1 and 2**.
+- **Standard** answers *what are we held to?* Each requirement is a row with its standing, the sentence that answers it (**What we say**), and its evidence. A requirement no sentence answers reads **no sentence answers this**, with **write one**. If nothing shows a requirement, click **Raise as a gap** to open a gap on the project. See [Gaps and findings](/user-guide/accreditation/gaps).
+
+Proof remembers your choice.
+
+### A narrative section
+
+Each section reads like a page in a word processor: the section's name is its heading, and each passage is a headed paragraph.
+
+A progress bar beside each passage's title, and beside the standard's head, shows how far the work has come. From the left: the requirements its sentences prove and the gaps closed (sage), what still falls short or has open gaps (clay), and what is not yet read or answered (dotted oak). After a wider gap, its optional work follows: writing notes and open suggestions, pale violet while open. When every part is done, the bar is one unbroken sage line. A screen reader reads the bar's counts aloud.
+
+- The bar above the section shows its review standing and two menus. **View** chooses which marks to show. **Actions** holds **Review**, **Writers…**, **History**, and, when suggestions are waiting, **Decide all** followed by the number of suggestions.
+- Rest on a passage to see its verbs: **Edit**, **Suggest**, and **Refresh proof**. You see only the verbs your role allows. **Edit** opens the words in place; click **Save** or **Cancel** when you're done.
+- Open suggestions sit under the passage they change. Each one is decided on its own card.
+- When the section is ready, click **Submit for review** on its review line. The line says who it goes to and anything out of line it carries. If the approver requests changes, edit the section and submit it again.
+
+### A section imported from a file
+
+When you import a section from a file, Proof reads each line to sort which ones are claims that need evidence. Until it finishes, the section says how many **lines being sorted** remain. Those lines carry no mark and are not counted. Lines that can never be a claim, such as page numbers, short headings, and table header rows, are set aside.
+
+If the file reads like a record rather than narrative (for example, it has a document ID, an owner, an issue date, or tables), the section asks once:
+
+- **Add it as evidence**: keeps the file as a library document, reads it against the project's standards, and takes the section off. You have five seconds to click **Undo**.
+- **Keep it as narrative**: keeps the section as it is. Proof won't ask again.
 
 ### Standard editor
 
-Select a standard to open it. The editor contains:
+Each standard shows these areas:
 
 | Area | What it shows |
 | --- | --- |
 | Narrative | Your written response to the standard, organized by section |
 | **Issues** | Findings on the narrative, such as **Unsupported claim**, **Vague claim**, **Hedging language**, **Passive voice**, and **Evidence needed** |
 | **Evidence** | Evidence slots for the standard and suggested document matches |
-| **Narrative Score** | How well the narrative is supported, from weak to **Strong** |
+| Progress bar | How far the standard's requirements, gaps, and notes have come (see [A narrative section](#a-narrative-section)) |
 | **Review Feedback** | Comments from reviewers |
 | **Source Compliance Gap** | The gap that this standard's work responds to |
 
-When a section is finished, select **Submit for Review** under it to send it to the approver. If the approver requests changes, edit the section and submit it again.
+Each gap's card carries its evaluation (cause, effect, and rating) and, when it is ready to close, the question **Is the cause resolved?** See [Gaps and findings](/user-guide/accreditation/gaps).
 
 ### Assistant
 
 The assistant walks you through a standard one requirement at a time. For each requirement, it asks what the program actually does and which record shows it. Proof then writes the narrative sentence from your answers and that record together.
 
-To open it, click the assistant button (**Assistant ·** followed by the standard's number) in the workspace header. The menu shows where the standard stands and these options:
+To open it, click the **p.** mark in the app's header, beside search and notifications. Its label names the standard, for example **Assistant · II-C**. The panel opens beside the editor, in place of the **Issues** rail. Click **Issues** at the foot of the panel to switch back, or click the **p.** again to close it. Drag the panel's left edge to resize it.
 
-- **Work through** followed by the standard's number: starts the walk. The first time, the walk opens as a full page. After that, it opens in a panel beside the editor.
-- **What should I do first?**: opens the requirement that needs you most, and says why.
-- **Pick up where I left off**: returns to the requirement you were on.
-- **Ask anything**: opens the panel in **Chat**.
+The panel has three leaves at the top: **Needs you**, **Steps**, and **Chat**. It opens on **Needs you** the first time, then on the leaf you used last.
 
-The panel takes the place of the **Issues** rail. Click **Issues** at the foot of the panel to switch back. Drag the panel's left edge to resize it.
+**Needs you** shows where the standard stands, for example "Standing · 2 fall short · 1 not proven", and what needs you most:
 
-Switch between two ways of working at the top of the panel. Both work on the same walk, so switching loses nothing:
+- **Work through** followed by the standard's number, with **Start**: shown until you have walked the standard once. The first walk opens as a full page.
+- The worst requirement and why it comes first, with **Open it**.
+- **Pick up where you left off**, with **Pick up**.
+- **Tour the Workspace**, at the foot. See [Tour the Workspace](#tour-the-workspace).
 
-- **Steps**: answer each requirement's questions in fields, then link or upload the record that shows it. When the record shows the sentence, click **place it** to put the sentence in the narrative section. If no record shows it yet, click **place anyway…** and give a reason. The sentence goes in marked open, and Proof keeps your reason on its history. Click **Skip for now** to move on without finishing a requirement.
+**Steps** and **Chat** are two ways of working the same walk, so switching loses nothing:
+
+- **Steps**: answer each requirement's questions, then link or upload the record that shows it. When the record shows the sentence, click **place it** to put the sentence in the narrative section. If no record shows it yet, click **place anyway…** and give a reason. The sentence goes in marked open, and Proof keeps your reason on its history. Click **Skip for now** to move on without finishing a requirement.
 - **Chat**: type your answers, or ask about the standard, its rules, or your records. Press **Ctrl+Enter** (**⌘+Enter** on a Mac) to send. When you ask the assistant to find a policy or document, it lists the records it found with the passage that matched. Click **Link** to use one as the requirement's evidence. Records found in Chat also appear in **Steps** under **Found in Chat**.
 
-The assistant only searches and links records your role lets you read. Your Chat thread on each standard is kept, so you can return to it later. When the walk is done, submit each section for review in the editor as usual.
+Your team shares one set of answers per requirement, and each answer shows who gave it. If you can't write to the section, the sentence goes in as a suggestion for its writers instead.
+
+The assistant only searches and links records your role lets you read. Your Chat thread on each standard is kept, so you can return to it later. When the walk is done, submit each section for review as usual.
+
+### The handwritten first pass
+
+When **Handwritten first pass** is on, the first walk through a standard opens as a page of paper. The assistant writes one question at a time in a handwritten script, and you answer in your own words. What you keep is set in type.
+
+- Press **Ctrl+Enter** (**⌘+Enter** on a Mac) to answer.
+- Click the **History** icon to see and change earlier answers.
+- Click the accessibility icon to switch to plain letters, with every icon named.
+- Press **Esc**, or click **Back to the room**, to leave. Your place is kept.
+
+The switch is on by default. To turn it off, open your profile, go to **Appearance**, and turn off **Handwritten first pass** under **Handwriting**. With it off, the first pass opens as a list of steps.
+
+### Tour the Workspace
+
+**Tour the Workspace** steps through the room in the order the work goes: read where the standard stands, find what's open, fix the words, prove it, and submit. Each card says what the step is for, then lights the part of the room where you do it. The tour opens only when you ask for it, from the foot of the assistant's **Needs you** or at the end of a first pass.
 
 ### Empty workspace
 
-If you see **No compliance gaps detected**, Proof has not yet found gaps for this project. Gaps are identified when a disclosure document is imported and parsed. Select **Create Gaps from Disclosure** to try again.
+What you see depends on the project:
+
+- **This project answers to no agency**: choose the agency the project answers to, then click **Set agency**. Its standards open in the workspace. If your college has not confirmed an agency yet, the page links to **Manage Compliance**.
+- **None of this agency's standards have reached your college yet**: the agency's standards have not been delivered to your college.
+- **No compliance gaps detected**: on a consulting firm's engagement, gaps come from a parsed disclosure document. Select **Create Gaps from Disclosure** to try again.
 
 ## What you can do here
 
 - Write and revise the narrative for a standard. Rewrite options include **Elaborate**, **Shorten**, and **Academic**, and you can **Undo rewrite**. See [Work a standard and close gaps](/user-guide/accreditation/how-to/work-a-standard).
 - Walk a standard requirement by requirement with the [assistant](#assistant).
-- Resolve or dismiss issues from the **Issues** rail. See [Work a standard and close gaps](/user-guide/accreditation/how-to/work-a-standard).
+- Resolve or dismiss issues from the **Issues** rail.
+- Evaluate a gap and answer its cause question. See [Gaps and findings](/user-guide/accreditation/gaps).
 - Use **Find evidence** and **Confirm** a match to link a document. See [Add evidence and match it to standards](/user-guide/accreditation/how-to/add-and-match-evidence).
 - Open the full self-study when the standards are ready. See [Prepare the self-study](/user-guide/accreditation/how-to/prepare-self-study).
 
@@ -82,13 +139,14 @@ If you see **No compliance gaps detected**, Proof has not yet found gaps for thi
     Assemble the full report.
   </Card>
 
-  <Card title="Start a project" icon="folder-plus" href="/user-guide/accreditation/how-to/start-a-project">
-    Set up a new accreditation project.
+  <Card title="Gaps and findings" icon="triangle-exclamation" href="/user-guide/accreditation/gaps">
+    Evaluate a gap and see it through to closed.
   </Card>
 </CardGroup>
 
 ## Related
 
 - [Projects](/user-guide/accreditation/projects)
+- [Gaps and findings](/user-guide/accreditation/gaps)
 - [Documents](/user-guide/accreditation/documents)
 - [Self-study document](/user-guide/accreditation/self-study)

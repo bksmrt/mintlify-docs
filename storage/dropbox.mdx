@@ -7,14 +7,14 @@ Connect a Dropbox account to browse your Dropbox folders and import documents in
 
 ## Before you start
 
-- Your Proof administrator must have configured the Dropbox OAuth client. If not, Dropbox shows as unavailable in the connect list.
-- Any member of your institution can connect an account from the **Import from cloud** dialog in a project's evidence tab.
+- Your Proof operator must have configured the Dropbox OAuth client. Until then, **Settings › Integrations** reads **Not configured by your administrator yet.** for Dropbox, and connecting fails with `provider_not_configured`.
+- Any member of your institution can connect an account from the **Import from cloud** dialog in a project's evidence tab. An institutional admin can also connect one in **Settings › Integrations › Storage**.
 
 ## Connect and import
 
 <Steps>
   <Step title="Open the import dialog">
-    In a project's evidence tab, click **Import from cloud**, then choose **Dropbox**.
+    In a project's evidence tab, click **Import from cloud**, then click **Connect** next to **Dropbox**.
   </Step>
   <Step title="Approve access">
     Sign in to Dropbox and allow access. Proof requests offline access so the connection keeps working without signing in again.

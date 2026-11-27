@@ -29,16 +29,16 @@ Rules are evaluated in ascending priority order, and the first active match wins
 Match types:
 
 - **Domain**: matches the email domain (for example, `acme.edu`).
-- **Group**: matches a group name from the IdP's `groups`, `memberOf`, or `roles` claims.
+- **Group**: matches a group name from the IdP's `groups`, `Groups`, `memberOf`, `MemberOf`, `role`, `roles`, or `isMemberOf` claims (a single string may hold a comma- or semicolon-separated list), or a group WorkOS Directory Sync reports for the user.
 - **Claim**: matches a custom claim key and value you specify.
 
 All matching is case-insensitive. If a user belongs to several groups that match different rules, the rule with the lower priority number takes precedence.
 
 ### Security guarantees
 
-- SSO can only assign the roles listed above. Platform-level roles are never assignable through SSO; an invalid rule falls back to `faculty`.
-- Proof never silently rebinds a user to a different SSO connection. If an email already belongs to another connection, sign-in is refused.
-- An account can belong to only one college. If a user already belongs to a different institution, the new connection will not provision them.
+- SSO can only assign the roles listed above. Platform-level roles are never assignable through SSO; an invalid default role falls back to `faculty`.
+- Proof never silently rebinds a user to a different SSO connection. If an email already belongs to another connection, sign-in is refused with "This email is already linked to a different organization's SSO. Contact your administrator."
+- An account can belong to only one college. An institution connection refuses to sign in an account that belongs to another institution, and records the refusal in the SSO audit log.
 
 ## Just-in-time provisioning
 
@@ -47,7 +47,9 @@ If a user signs in through SSO and no matching account exists, Proof creates one
 - **Institution connections**: the user is added to the institution's membership list with the role evaluated from your rules.
 - **Firm connections**: the user is added as an active consultant.
 
-If the user already exists (for example, they were invited by email), their account becomes SSO-bound and their role is updated according to the current connection rules.
+If the user already exists (for example, they were invited by email), their account becomes bound to the connection, and its role is set from the connection's rules.
+
+Proof evaluates the rules again at every SSO sign-in and writes the result to the account's role, so a role changed by hand in Proof is replaced at the user's next SSO sign-in.
 
 ## Session lifetime and behavior
 
@@ -73,8 +75,9 @@ Sessions are revoked immediately when:
 
 - An admin **disables or deletes** an SSO connection. All sessions tied to that connection end, and users must sign in again.
 - An admin clicks **Force logout all** on the SSO panel. Every active SSO session for the tenant is revoked.
-- An admin **changes a user's role** or marks them inactive.
-- Directory Sync reports a user as inactive (see [Deprovisioning](#deprovisioning)).
+- An admin **changes a user's role or membership**, deactivates them, or deletes their account.
+- Directory Sync reports a user as inactive or deleted (see [Deprovisioning](#deprovisioning)).
+- An existing account signs in through SSO: its older sessions, including any from another sign-in method, end.
 
 ## Deprovisioning
 
@@ -95,20 +98,22 @@ Proof performs the same deactivation steps. The account record is kept for audit
 
 ### Reactivation
 
-If the IdP later reactivates the user, Proof marks the account active again, restores firm membership if applicable, and allows normal sign-in.
+If the IdP later reactivates the user, Proof marks the account active again, restores the institution or firm membership, and allows normal sign-in.
+
+Directory Sync updates a user's name and email, but never their role. The role changes only at the next SSO sign-in.
 
 ## Role changes after provisioning
 
-Changes to role mapping rules take effect on the user's next sign-in. Existing sessions are not updated retroactively. To apply a role change right away:
+Changes to role mapping rules take effect on the user's next SSO sign-in. Existing sessions keep the role they started with. To apply a rule change right away:
 
 1. Update the role rules.
 2. Ask the user to sign out and back in, or use **Force logout all** so users re-authenticate on their next visit.
 
 ## Require SSO
 
-When you enable **Require SSO for users on matched domains**, users whose email domains match the connection's verified domains must sign in through SSO. The standard sign-in fallback is blocked for them.
+When **Require SSO for users on matched domains** is on and the connection is active, users whose email domains match the connection's verified domains must sign in through SSO. The standard sign-in is refused for them, and the sign-in page does not offer it.
 
-This setting applies per connection and takes effect immediately. Users already signed in through the standard flow keep their session until it expires or is revoked.
+This setting applies per connection. Users already signed in through the standard flow keep their session until it expires or is revoked.
 
 ## Best practices
 

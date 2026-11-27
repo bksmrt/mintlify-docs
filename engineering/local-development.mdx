@@ -39,11 +39,15 @@ The server reads the names below from `process.env`. Only names are listed here;
 | `AI_INTEGRATIONS_GEMINI_API_KEY` | Google Gemini API key |
 | `STRIPE_SECRET_KEY` | Stripe secret key |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret |
-| `SENDGRID_API_KEY` | SendGrid API key (optional; falls back to SMTP or Replit connectors) |
+| `SENDGRID_API_KEY` / `RESEND_API_KEY` | Email provider keys (optional; email falls back to SMTP) |
+| `MAIL_FROM` | Default sender address |
+| `INTEGRATION_CREDENTIAL_KEY` | Encryption key for stored SIS integration credentials |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` | SMTP fallback for email |
 | `REPL_ID` / `REPL_IDENTITY` | Replit identity headers (when running on Replit) |
 | `PUBLIC_BASE_URL` | Canonical base URL for links and redirects |
 | `SSO_DATA_KEY` | Encryption key for SSO state cookies |
+| `SOURCE_MONITOR_CRON`, `CATALOG_BACKFILL_CRON`, `CONTROL_HEALTH_CRON`, `PEER_SNAPSHOT_CRON`, `REPORT_DELIVERY_CRON` | Override the default schedule of each pg-boss clock |
+| `*_QUEUE_DRIVER` (for example `PARSER_QUEUE_DRIVER`, `SIS_SYNC_QUEUE_DRIVER`, `ICI_RECOMPUTE_QUEUE_DRIVER`) | `pg-boss` (default) or `memory` for each worker queue |
 
 There are dozens more for AI model routing, queue workers, billing, catalog backfill, and SIS sync. Search `process.env` under `server/` to discover them.
 
@@ -87,12 +91,13 @@ Apply the schema to your local database with:
 npm run db:push
 ```
 
-This runs `drizzle-kit push` and syncs `shared/schema.ts` to Postgres. If Drizzle offers to drop and recreate a table (for example, `agency_standards_catalog`), say no and read `docs/schema-migrations.md` for recovery. The project is db-push-driven; the drizzle journal under `migrations/meta/` is historical and no longer maintained.
+This runs `drizzle-kit push` and syncs `shared/schema.ts` to Postgres. If Drizzle offers to drop and recreate a table (for example, `agency_standards_catalog`), say no and read `docs/schema-migrations.md` for recovery. The project is db-push-driven; the drizzle journal under `migrations/meta/` is historical and no longer maintained. After a merge, `bash scripts/post-merge.sh` installs dependencies, applies the known idempotent deltas in `scripts/post-merge-prep.cjs`, and checks every table and column against the schema (`scripts/post-merge-drift-check.ts`).
 
 ## Common gotchas
 
-- **Stale compiled schema twin**: A compiled `shared/schema.js` sits next to `shared/schema.ts`. Vite's default resolution tries `.js` before `.ts`, so tests can silently validate against a months-old copy. Both `vitest.config.ts` and `vite.config.ts` pin `@shared/schema` to the `.ts` source explicitly.
+- **Stale compiled schema twin**: If a compiled `shared/schema.js` ever sits next to `shared/schema.ts`, Vite's default resolution tries `.js` first, so tests could validate against an old copy. Both `vitest.config.ts` and `vite.config.ts` pin `@shared/schema` to the `.ts` source explicitly; keep those pins.
 - **Term without `catalog_year_id`**: `academic_terms.catalog_year_id` is a stored fact, not derived on read. A term without it silently validates its sections against the wrong year's course row. The demo seed pins this column carefully.
 - **Dev login persona roles**: The seeded deans carry `department_head`, not `dean`, because `department_head` is the only non-admin role Workload Studio admits. Department-scoped teaching reads key off `users.department_id`.
-- **Mockup sandbox previews**: The canvas only renders the `main` branch, so mockups built inside an isolated task branch are not visible there. Build mockups only when working on `main`.
+- **Fixtures for redesign work**: `client/fixtures/*.html` pages mount the real page over `client/fixtures/stub.ts`. Render them with `node scripts/reskin-shot.mjs`.
+- **Mockup sandbox previews**: The canvas only renders the `main` branch, so mockups built inside an isolated task branch are not visible there.
 - **Node 22 requirement**: `pg-boss@12` requires Node `>=22.12`. On Node 20, `npm ci` crashes mid-reify with unlinked dev tooling.

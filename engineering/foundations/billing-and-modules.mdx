@@ -1,0 +1,70 @@
+---
+title: "Billing and modules"
+description: "The module registry that decides which routes and pages each licensable module gates, and the server gate that enforces it."
+sidebarTitle: "Billing and modules"
+---
+
+Proof sells its features as modules. One registry says what each module is, which tenant family may hold it, and which API routes and pages it gates. The server's module gate and the client's entitlements hook both read that registry, so a page can never gate differently from the API it calls.
+
+## Where things live
+
+| Concern | File or module |
+| --- | --- |
+| Module registry | `shared/modules.ts` (`MODULE_CODES`, `MODULES`, `SHARED_CONTAINERS`, `BASE_MODULES`) |
+| Server gate | `server/billing/moduleGate.ts` (`buildModuleCheck`, `buildModuleGateMiddleware`) |
+| Base floor and entitlements | `server/billing/entitlements.ts` |
+| Client entitlements hook | `client/src/hooks/useEntitlements.ts` |
+| Stripe client, checkout, webhooks | `server/billing/stripeClient.ts`, `checkout.ts`, `webhooks.ts` |
+| PO invoicing and price locks | `server/billing/poInvoicing.ts`, `priceLockExpiry.ts` |
+| Plan catalog | `server/billing/planCatalog.ts`, `catalogAdmin.ts` |
+| The census test | `scripts/__tests__/module-census.test.ts` |
+| The map | `docs/design/billing-modules.md` |
+
+## The modules
+
+| Code | Name | Family | Standing |
+| --- | --- | --- | --- |
+| `compliance_core` | Compliance Core | both | base |
+| `firm_engagement` | Firm & Engagement Tools | firm | base |
+| `academic` | Academic Operations | institution | optional |
+| `peer_benchmarking` | Peer Benchmarking | both | optional, fail-closed |
+| `reporting` | Report Studio | both | retired |
+
+- **Base** modules come with any paid subscription for a family that may hold them. They are never sold or revoked on their own.
+- **Optional** modules are purchased, granted by an operator, or trialed.
+- **Retired** modules keep their enum value so old rows still read, but gate nothing. Report Studio became base functionality for every tenant.
+
+Each module lists `apiPrefixes` and `pagePrefixes`. Matching is boundary-aware (`/api/catalog` matches `/api/catalog/2025` but not `/api/catalog-banners`), and the longest matching prefix wins.
+
+`SHARED_CONTAINERS` covers routes more than one module needs. Projects, tasks, and phases are reachable with either `compliance_core` or `firm_engagement`. `SHARED_API_PREFIXES` and `SHARED_PAGE_PREFIXES` are open to every tenant.
+
+## The gate
+
+`buildModuleGateMiddleware` resolves the request path to the modules that may serve it (`resolveModulesForApiPath`) and checks the tenant's entitled modules:
+
+| Outcome | Response |
+| --- | --- |
+| No module required, or tenant holds one | Pass |
+| Tenant holds none | `402` with `error: "module_not_licensed"`, the accepted modules, and `billing.actionUrl: "/billing"` |
+| Entitlement check fails on a fail-closed module | `503` with `error: "entitlement_check_unavailable"` |
+
+The gate fails **open** by default: if the check itself errors, the route's own authorization still answers. Peer Benchmarking is the exception. It serves anonymized cross-tenant data, so a fault denies rather than risks leaking peer data.
+
+Firm users working inside an engaged college's academic area ride on that college's `academic` license. Engagement checks downstream decide what they may do.
+
+`buildModuleCheck` is the same decision without a request path. The report chat and the custom report builder call it for the report or record type they are about to read, so nothing reaches a tenant through the chat that its own route would refuse. Every delivered report and builder record type names its module in `shared/report-catalog.ts` and `shared/report-data-catalog.ts`.
+
+## Adding a route or page
+
+1. Put the API prefix and page prefix under the right module in `shared/modules.ts`, or under a shared container or the shared lists.
+2. Run `scripts/__tests__/module-census.test.ts`. It fails if any `/api/<prefix>` the server registers or any page `App.tsx` routes is not classified exactly once.
+
+<Warning>
+  Never hard-code a module check in a page or route. Read the registry, or the census and the gate drift apart.
+</Warning>
+
+## Related pages
+
+- [Tenancy and authentication](/engineering/foundations/tenancy-and-auth)
+- [Reporting](/engineering/areas/reporting)
+- [Score family and the ICI](/engineering/foundations/score-family)

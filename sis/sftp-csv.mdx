@@ -4,9 +4,9 @@ description: "Sync curriculum and faculty data by dropping nightly CSV files on 
 sidebarTitle: "SFTP / CSV Drop"
 ---
 
-The SFTP / CSV Drop integration is Proof's fully active, long-tail SIS connector. Your institution drops nightly CSV files on an SFTP server, and Proof connects on a schedule to download, parse, and import the rows. This path works with any SIS that can export CSV, and it does not require a vendor API or sandbox.
+The SFTP / CSV Drop is the SIS feed a college can connect today. Your institution drops nightly CSV files on an SFTP server, and Proof connects on a schedule to download, parse, and import the rows. This path works with any SIS that can export CSV, and it does not require a vendor API or sandbox.
 
-The connector looks for five files per drop: `courses.csv`, `departments.csv`, `programs.csv`, `terms.csv`, and `faculty.csv`. Files must be regular CSV files with a header row. Match is case-insensitive on the file name, and unrecognized files in the same directory are ignored.
+The connector looks for five files in the folder: `courses.csv`, `departments.csv`, `programs.csv`, `terms.csv`, and `faculty.csv`. Files must be regular CSV files with a header row. File names match case-insensitively, and other files in the same folder are ignored. A drop can hold only some of the files.
 
 ## Setup steps
 
@@ -18,13 +18,13 @@ The connector looks for five files per drop: `courses.csv`, `departments.csv`, `
     In Proof, open **Settings**, select the **Integrations** tab, and find the **Student records** section. Click **Connect the registrar’s drop**.
   </Step>
   <Step title="Enter the server details">
-    Fill in **Server**, **Port** (22 by default), **Folder**, and **Signs in as**. Enter a **Password**, or paste a key under **Or a private key**.
+    Under **Where the files are**, fill in **Server**, **Port** (22 by default), **Folder**, and **Signs in as**. Enter a **Password**, or paste a key under **Or a private key**. Leave **Folder** empty to read the sign-in's home folder.
   </Step>
   <Step title="Test the folder">
-    Click **Test the folder**. Proof lists the files and reads their headers. If it fails, you see **Could not read the folder.** with the reason. When it passes, click **Next: columns**.
+    Click **Test the folder**. Proof lists the files it found, with their row counts. If it fails, you see **Could not read the folder.** with the reason. Tick the files to bring in; faculty is off until you turn it on. Then click **Next: columns**.
   </Step>
   <Step title="Check the columns">
-    Proof matches each field to a column in its file by name, using the defaults below. Check the preview under each file, then click **Next: when it runs**.
+    Proof matches each field to a column in its file by name, using the defaults below. For each field you can pick another **Column** and how to **Tidy it**. Check the preview under each file, then click **Next: when it runs**.
   </Step>
   <Step title="Choose when it runs and save">
     Under **Runs**, pick **Nightly, around 2:00**, **Weekly, around 2:00**, or **Only when someone presses Sync now**. Click **Save and preview**. The first run is a preview and writes nothing until you press **Sync now** or the first scheduled run happens.
@@ -33,7 +33,11 @@ The connector looks for five files per drop: `courses.csv`, `departments.csv`, `
 
 ## File names and CSV columns
 
-Each file must contain the columns listed below. Column names in your CSV can differ from these defaults as long as you map them correctly in the field-mapping editor.
+Each file should contain the columns listed below. Column names in your CSV can differ from these defaults as long as you map them on the **Columns** step, or later with **Save columns** in the section's **Columns** panel.
+
+### Record keys
+
+Proof identifies each row by an `id` or `external_key` column. Include one in every file. Without it, a row is keyed by its whole content (faculty rows fall back to `email`, then `full_name`), so editing any value makes it a new record and the old one is archived.
 
 ### `courses.csv`
 
@@ -42,8 +46,10 @@ Each file must contain the columns listed below. Column names in your CSV can di
 | `subject` | Course subject abbreviation | Yes |
 | `course_number` | Course catalog number | Yes |
 | `title` | Course title | Yes |
-| `credits` | Credit hours | No |
-| `department_code` | Department code that links this course to a department row | No |
+| `credits` | Credit hours, read as a whole number | No |
+| `department_code` | Code of the department the course is filed under | Yes, in practice |
+
+A course is filed under the department its `department_code` names. A course with a blank code, a code that matches no department, or a department that has no administrative unit yet is not written; the run lists it under what waits on you, with the fix. Proof uppercases `subject` and trims `title` and `department_code` by default.
 
 ### `departments.csv`
 
@@ -76,36 +82,29 @@ Each file must contain the columns listed below. Column names in your CSV can di
 | `tenure_status` | Tenure status | No |
 
 <Warning>
-  If a required column is missing or empty for a row, that record may be skipped during the sync. The run report lists the exact reason for each skipped row.
+  If a required column is missing or empty for a row, that row is refused. The run report names each refused row and the reason.
 </Warning>
 
 ## Preview your files
 
-Proof does not offer downloadable sample files. Instead, after you create a connection, Proof reads the files currently in your drop and previews them while you map columns. For each file, you see its columns and its first three rows, so you can check that the headers match before the first sync. Nothing is written to your catalog during the preview.
+Proof reads the files currently in your drop and previews them while you map columns. For each file, you see its columns and its first rows, so you can check that the headers match before the first sync. Nothing is written to your catalog during the preview.
 
-Only users who can manage the connection see the preview. Other users see the saved column mappings without sample rows.
+Only users who can manage the feed see sample rows. Other users see the saved column mappings without them.
 
 ## Delivery expectations
 
-- **Frequency**: Most institutions publish a fresh drop nightly. You can schedule Proof to pull as often as hourly, but a daily cadence is typical.
-- **Completeness**: Each drop should be a full snapshot of the enabled entities. The engine processes every file it finds and archives records that no longer appear in a full sync.
-- **File size**: The probe step that counts rows before each sync limits file reads to 2 MB per file. Files larger than that are noted by size rather than row count. If your export regularly exceeds this, consider splitting files or contacting Proof support.
+- **Frequency**: Publish a fresh drop before the feed runs. **Nightly, around 2:00** is the usual choice; **Weekly, around 2:00** runs every seven days.
+- **Completeness**: Each file should be a full snapshot. After a sync that writes and has no failures, Proof archives rows of each record type that are missing from that type's file. A file that is missing or has no rows archives nothing for its type.
+- **File size**: The test, and the check at the start of each sync, count rows only in files up to 2 MB. Larger files are named with their size instead. The sync itself reads the whole file.
 - **Timing**: The SFTP connection timeout is 15 seconds. Ensure your server responds within that window.
-
-## Custom file names
-
-If your institution uses different file names (for example, `COURSES_EXPORT.csv` instead of `courses.csv`), you can override the file name per entity in the connection settings. The match remains case-insensitive.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| "Auth failed" during test | Wrong password, key, or username; or host not reachable | Verify credentials and firewall rules |
-| "No files found" | Directory is empty or file names do not match | Check the remote directory path and file names |
-| Courses created with no department | `department_code` missing or not mapping to a known department | Add the department code column and map it; ensure the department exists in the same drop |
-| Sync run shows "failed" | Network error, SFTP server unreachable, or file unreadable | Check server logs, then retry the run manually |
-| Faculty records skipped | Missing `full_name` or duplicate `email` | Review the CSV and fix missing required fields |
-
-<Note>
-  If you cannot host an SFTP server, ask Proof support about alternative delivery options. Some environments support browser upload of the same five CSV files as a one-time or pilot sync.
-</Note>
+| **Could not read the folder.** during the test | Wrong password, key, or username; host not reachable; or wrong folder | Verify credentials, firewall rules, and the folder path |
+| "Reached … but it holds none of courses.csv, departments.csv, …" | The folder is empty or the file names differ | Rename the exports to the expected file names |
+| Feed stamp reads **Failing**, runs read **Could not sign in** | The SFTP password or key changed at the college | Click **Update the SFTP password** and enter the new one |
+| Courses wait on you | Blank `department_code`, a code that matches no department, or a department with no administrative unit | Fix the code in the export, or link a unit on the department's page; the next run files the course |
+| Run reads **Failed** | SFTP server unreachable or file unreadable | Check the server, then press **Sync now** |
+| Faculty rows refused | Missing `full_name` | Fill in the missing names in `faculty.csv` |

@@ -1,140 +1,115 @@
 ---
 title: "Sync and field mapping"
-description: "How Proof's sync engine processes SIS records, resolves conflicts, and reports results."
+description: "How Proof's sync engine maps SIS columns, writes records, archives what is gone, and reports each run."
 sidebarTitle: "Sync and field mapping"
 ---
 
-When you connect an SIS and start a sync, Proof's engine fetches records from the vendor, applies your field mappings, reconciles changes against the local catalog, and writes the outcomes to a run report. Understanding this pipeline helps you read run results, fix mapping errors, and decide when to intervene.
+When your SIS feed runs, Proof's engine reads the files, applies your column mappings, writes the changes to your catalog, and records each outcome in a run report. Understanding this pipeline helps you read run results, fix mapping problems, and decide when to intervene.
 
 ## Field mapping
 
-Before any record is written, the engine transforms each vendor field into the Proof field you mapped. You control this mapping in the connection wizard on a per-connection basis.
+Before any record is written, the engine copies each column to the Proof field you mapped it to. You set this on the **Columns** step when you connect the feed, and change it later in the **Columns** panel of the **Student records** section with **Save columns**.
 
 ### Default mappings
 
-Every vendor connector ships with default mappings. For example, the SFTP / CSV Drop connector maps the course number column to the Proof course number field by default. If your CSV uses different column names, you can override each mapping in the editor.
+The CSV feed maps each field to a column of the same name in its file, for example `course_number` to the course number. See [File names and CSV columns](/sis/sftp-csv#file-names-and-csv-columns) for every default. If your CSV uses different column names, pick the right **Column** for each field.
 
 ### Transforms
 
-You can apply optional transforms to source values during the sync:
+Each field can apply one transform, shown as **Tidy it**:
 
 | Transform | Effect | Example |
 | --- | --- | --- |
 | `uppercase` | Converts the value to uppercase | `bio` becomes `BIO` |
-| `trim` | Removes leading and trailing whitespace | `ENG` becomes `ENG` |
-| `to_int` | Parses the value as an integer | `"3"` becomes `3` |
-| `to_float` | Parses the value as a float | `"3.5"` becomes `3.5` |
-| `to_iso_date` | Parses and formats as an ISO date | Various formats become `YYYY-MM-DD` |
+| `trim` | Removes leading and trailing whitespace | `" ENG "` becomes `ENG` |
+| `to_int` | Parses a number and drops any decimals | `"3"` becomes `3` |
+| `to_float` | Parses a number | `"3.5"` becomes `3.5` |
+| `to_iso_date` | Parses a date and writes it as an ISO 8601 timestamp in UTC | `2026-08-24` becomes `2026-08-24T00:00:00.000Z` |
 
-### Required and optional fields
+A value a transform cannot read (for example, `three` under `to_int`) is left out, and the run records a warning on that record. The column preview applies the same transforms, so it shows what the run will write.
 
-A field marked required in the mapping editor must be present and non-empty for a record to be processed. If a required field is missing, the record is skipped and the reason appears in the run report.
+### Required fields
+
+Each record type has its own required fields: a course needs a subject, course number, and title; a program needs a name and credential type; a department a name; a term a code and name; a faculty member a full name. A row missing one is refused, and the run report gives the reason.
 
 ## The sync run engine
 
 A sync run proceeds through the following stages:
 
 <Steps>
-  <Step title="Lock and fetch">
-    The engine acquires a per-connection advisory lock so two runs for the same module cannot overlap. It then fetches pages of records from the vendor, respecting the vendor's pagination and any rate limits.
+  <Step title="Lock and read">
+    The engine takes a lock per connection and module, so two runs of the same module cannot overlap. It then reads the files from the SFTP folder.
   </Step>
   <Step title="Apply mappings">
-    Each raw record is transformed using the connection's field mappings and transforms. Records that cannot be mapped are tagged with a warning.
+    Each row is transformed using the feed's column mappings and transforms.
   </Step>
-  <Step title="Upsert in batches">
-    Mapped records are written to the catalog in batches of 500. For each row, the engine decides whether to create a new record, update an existing one, or skip it.
+  <Step title="Write in batches">
+    Mapped records are written in batches of 500. Departments are written before courses, so a course can find the department its code names. For each row, the engine creates a record, updates one, skips it, or refuses it.
   </Step>
   <Step title="Archive missing records">
-    After a successful full sync, records that previously came from this connection but no longer appear in the vendor feed are archived. This keeps your catalog in sync with the SIS without leaving stale rows behind.
+    After a run that writes and has no failures, rows of each record type that came from this feed but are missing from that type's file are archived. A file that is missing or empty archives nothing for its type, so an emptied export never wipes your catalog. A preview never archives.
   </Step>
   <Step title="Record outcomes">
-    Every batch updates aggregated counters on the run (created, updated, skipped, archived, errored). Individual record states are recorded up to a cap of 500 per batch to keep storage bounded.
+    Each batch updates the run's counts and keeps a record of what happened to each row, by name and with its reason.
   </Step>
 </Steps>
 
 ## Run triggers
 
-You can start a sync run in several ways:
-
 | Trigger | How to start | Behavior |
 | --- | --- | --- |
-| Manual | Click **Sync now** in the **Student records** section | Runs immediately with the full module set |
+| Manual | Click **Sync now** in the **Student records** section | Runs the feed's enabled modules and writes to the catalog |
+| Preview | Click **Preview** in the **Student records** section | Reads the files and shows what would happen, without writing |
 | Scheduled | Pick a schedule under **Runs** (click **Change**) | Runs automatically at the chosen cadence |
-| Preview | Click **Preview** in the **Student records** section | Fetches and previews changes without writing to the catalog |
-| Test | Run a test connection during setup | Lightweight probe that validates credentials and lists files |
-| Full resync | Enable the full-resync option | Forces a fresh fetch, ignoring the high-water mark |
+
+Testing the folder while you connect is not a run. It only signs in and lists the files.
 
 ## Scheduling options
 
-In the app, the **Runs** setting offers **Nightly, around 2:00**, **Weekly, around 2:00**, or **Only when someone presses Sync now**. The underlying schedule supports:
+Under **Runs**, choose **Nightly, around 2:00**, **Weekly, around 2:00**, or **Only when someone presses Sync now**. Proof spreads scheduled runs by up to ten minutes either side of 2:00, which is why the section says *around*. A weekly run repeats every seven days from when you set it.
 
-- **Frequency**: hourly, daily, or weekly
-- **Time of day**: for daily and weekly runs (for example, `02:00`)
-- **Jitter**: a random offset in seconds (plus or minus) to spread load across the infrastructure
+Scheduled runs dispatch only while the feed is live. A paused feed, or one whose stamp reads **Failing** because it could not sign in, does not run on schedule until you click **Resume** or update the password.
 
-Schedules only dispatch when the connection status is active. If a run fails with an authentication error, scheduled runs for that connection are skipped until the credentials are refreshed.
+## Changes made in Proof
 
-## Reconciliation
+When a synced record differs from the incoming row, the engine compares the fields the file carries and updates only those. These cases leave the record as it is and skip the row:
 
-Reconciliation is a lightweight drift check that compares a sample of SIS records against the corresponding Proof records. It helps you confirm that fields you mapped are landing correctly over time. You can trigger a reconciliation manually from the connection panel. There is no automatic reconciliation on every run; it is intended as an occasional spot-check.
+- The college marked the record as a manual override, so the SIS no longer owns it.
+- The college archived the record by hand. The sync leaves it archived.
+- Nothing changed.
 
-## Conflict resolution
-
-When an incoming SIS record differs from the existing Proof record, the engine scores the change as one of three magnitudes:
-
-| Magnitude | What it means | Examples |
-| --- | --- | --- |
-| **Trivial** | No meaningful change | Last updated timestamp, source run identifier, or metadata-only differences |
-| **Minor** | Small semantic change | Title rephrasing with high Jaccard similarity (0.85 or above) |
-| **Major** | Structural or material change | New subject, course number, credits, department code, or a major rewrite |
-
-If you manually edit a field in Proof and the SIS later sends a different value for the same field, the engine detects the conflict. The current behavior flags these cases in the run data; a future release will surface them in a dedicated review queue where you can choose which value to keep.
-
-<Note>
-  New records always score as major, because the entire row is new. The engine also flags server-owned fields (such as the catalog year identifier) so they are never overwritten by a sync.
-</Note>
+Fields the file does not carry are never cleared, and server-owned fields such as the catalog year are never overwritten. Courses are written into the active catalog year.
 
 ## Run statuses
 
-Each sync run ends with one of the following statuses:
+The **Runs** list stamps each run with what happened:
 
-| Status | Meaning |
+| Stamp | Meaning |
 | --- | --- |
-| `running` | Currently in progress |
-| `completed` | All batches finished with no hard failures |
-| `failed` | A hard error stopped the run (for example, authentication failure or network timeout) |
-| `partial` | Some batches succeeded and others failed |
-| `stalled` | The run timed out or was abandoned |
-| `cancelled` | Cancelled by an operator |
+| **Running** | Queued or in progress |
+| **Preview** | A preview finished; nothing was written |
+| **Filed** | Every row was written or skipped |
+| **Filed · some wait** | The run finished, but some rows were refused and wait on you |
+| **Filed · a part failed** or **Preview · a part failed** | One module failed and another finished |
+| **Failed** | The run failed, for example because the folder could not be read |
+| **Could not sign in** | The run failed because the SFTP sign-in was refused |
 
-## Record outcomes
+Underneath, a run's status is `queued`, `running`, `completed`, `partial`, `failed`, `stalled` (the process stopped mid-run), or `cancelled`.
 
-Per-record outcomes appear in the run report:
+## Reading a run
 
-| Outcome | Meaning |
-| --- | --- |
-| **Created** | A new record was inserted into the catalog |
-| **Updated** | An existing record was modified |
-| **Skipped** | The record was ignored, usually because a required field was missing or the record was a duplicate |
-| **Archived** | The record no longer appears in the vendor feed and was archived |
-| **Errored** | The record could not be processed due to a database constraint, conflict, or unexpected error |
-| **Review queued** | The record has a conflict between a manual edit and the incoming SIS value |
+Open a run in the **Runs** list to see its report:
+
+- **Waits on you · worst first** (**Would wait on you** for a preview): each refused row by name, with the reason and where to fix it. A course whose department has no administrative unit comes first, since it holds back every course filed under that department.
+- **Filed** (**Would be filed** for a preview): each written row by name, with what happened, such as the department a course was filed under.
+
+If many rows wait on you, check the column mappings first. Most refusals come from missing required columns, mismatched department codes, or column names that changed in the export.
 
 ## Webhook events
 
 When a sync run finishes, Proof emits a webhook event you can consume:
 
-- `sync.run.finished` when the run completes or reaches a partial state
-- `sync.run.failed` when the run fails, stalls, or is cancelled
+- `sync.run.finished` when the run ends `completed` or `partial`
+- `sync.run.failed` when the run ends `failed`
 
-These events include the run ID, connection ID, and final status. To learn how to receive and verify these events, see the [webhooks overview](/webhooks/overview) and [webhook events](/webhooks/events).
-
-## Run details and errors
-
-Open any finished run to see:
-
-- Aggregated counts per outcome
-- A per-record list (up to 500 rows per batch) with the external key, action, magnitude, and any error message or warning
-- Vendor metadata, such as the driver name or response diagnostics
-
-If a run shows a large number of skipped or errored records, review the field mappings first. Most errors stem from missing required fields, mismatched department codes, or column names that changed on the vendor side.
+Previews send these events too, with `isDryRun: true`. The payload includes the run ID, connection ID, modules, and final status. To learn how to receive and verify these events, see the [webhooks overview](/webhooks/overview) and [webhook events](/webhooks/events).

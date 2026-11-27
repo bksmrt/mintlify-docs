@@ -6,11 +6,11 @@ sidebarTitle: "Overview"
 
 Webhooks let your systems react to events in Proof as they happen. Instead of polling for changes, you register an HTTPS endpoint and Proof delivers a signed POST for each event you subscribe to. Common uses include updating a data warehouse when an SIS sync finishes, triggering an internal alert when a compliance gap resolves, or recording a billing state change in your ERP.
 
-Webhook management is available to institutional admin users from the Proof admin UI.
+Webhook management is available to institutional admins in **Settings › Webhooks**.
 
 ## How webhooks work
 
-When a subscribed event occurs, Proof queues a delivery for each enabled endpoint that listens to that event type. A background worker then POSTs the signed event envelope to your URL. The entire flow is fire-and-forget: the action that triggered the event (for example, a sync run or gap resolution) completes even if your endpoint is temporarily unreachable.
+When a subscribed event occurs, Proof queues a delivery for each enabled endpoint that listens to that event type. A background worker picks up queued deliveries about once a minute and POSTs the signed event envelope to your URL. The entire flow is fire-and-forget: the action that triggered the event (for example, a sync run or gap resolution) completes even if your endpoint is temporarily unreachable.
 
 ## Manage endpoints in the UI
 
@@ -19,10 +19,10 @@ When a subscribed event occurs, Proof queues a delivery for each enabled endpoin
     Go to **Settings**, then **Webhooks**. The panel is titled **Outbound webhooks**.
   </Step>
   <Step title="Add an endpoint">
-    Enter your **Endpoint URL** and select the event types you want to receive. If you select none, the endpoint receives every event type (`*`). Click **Add endpoint**.
+    Enter your **Endpoint URL** and click the event types you want to receive. If you select none, the endpoint subscribes to `*` and receives every event type. Click **Add endpoint**.
   </Step>
   <Step title="Copy the signing secret">
-    After creation, the UI displays the signing secret once. Copy it immediately and store it securely. Proof never shows the secret again.
+    After creation, the panel shows **Signing secret (shown once — store it now)**. Copy it immediately and store it securely. Proof never shows the secret again; to get a new one, delete the endpoint and add it again.
   </Step>
   <Step title="Send a test delivery">
     Click the send (paper plane) button on the endpoint row. Proof shows **Test delivery queued** and queues a `ping` event, delivered within a minute, so you can verify connectivity and signature verification before going live.
@@ -34,13 +34,13 @@ When a subscribed event occurs, Proof queues a delivery for each enabled endpoin
 
 ## Signing and verification
 
-Every delivery carries three headers:
+Every delivery is a `POST` with `Content-Type: application/json` and three Proof headers:
 
 | Header | Purpose |
 | --- | --- |
 | `X-Booksmart-Signature` | HMAC-SHA256 signature with a timestamp, used to verify authenticity |
 | `X-Booksmart-Event` | The event type (for example, `sync.run.finished`) |
-| `X-Booksmart-Delivery` | A unique delivery ID for idempotency |
+| `X-Booksmart-Delivery` | The delivery ID: one event to one endpoint, the same on every retry |
 
 The payload is a JSON envelope containing `eventId`, `eventType`, `institutionId`, `occurredAt`, and a `data` object. Your endpoint should verify the signature before trusting the payload. See [Verify signatures](/webhooks/verify-signatures) for the algorithm and sample verifiers.
 
@@ -91,8 +91,9 @@ app.post("/hooks/proof", express.raw({ type: "application/json" }), (req, res) =
 ## Security notes
 
 - Secrets are generated as `whsec_` followed by 48 hex characters. Treat them as credentials.
-- Internal and private IP addresses are rejected when you add an endpoint URL. Proof validates the URL at creation time and again at every delivery to prevent SSRF.
-- Only institutional admin users can create, edit, or delete webhook endpoints.
+- The HMAC key is the whole secret string, including the `whsec_` prefix.
+- Endpoint URLs must use `http:` or `https:`. Internal and private addresses are rejected when you add an endpoint. Proof validates the URL at creation time and again at every delivery, including each redirect, to prevent SSRF.
+- Only institutional admins can create, enable, disable, test, or delete webhook endpoints.
 
 ## Related pages
 

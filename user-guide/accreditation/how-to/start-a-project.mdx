@@ -41,28 +41,23 @@ You need one of the following to start a project:
     The recommended option is marked with a **Recommended** badge. Click the card you prefer. A checkmark appears on the selected card.
   </Step>
   <Step title="Review and confirm project details">
-    In the **Project Details** card, review the pre-filled fields:
+    In the **Project Details** card, review the pre-filled fields, such as **Initiative Name**, **Initiative Type**, **Department**, the linked regulatory change, and **Description**. Edit any field as needed. If the initiative name already exists, Proof warns you and blocks creation.
 
-    - **Initiative Name**
-    - **Initiative Type**
-    - **Department** (optional)
-    - **Linked to:** (pre-set to the regulatory change)
-    - **Description**
-    - **Primary Objective**
+    If your college's Ethos asks new work to name a strategic objective, choose one in **Strategic objective it serves**. When the Ethos requires it, you can't continue without one. When it only suggests one, you can leave it as **None**.
 
-    Edit any field as needed. If the initiative name already exists, Proof warns you and blocks creation.
+    Click **Continue to Review**.
   </Step>
-  <Step title="Select a governance model">
-    On the final review screen, choose a **Governance model** from the dropdown:
+  <Step title="Check the governance model">
+    The review step shows the **Governance model** the project starts on, from your college's Ethos (or your department's approved exception):
 
     - **Consensus**: every required reviewer must weigh in
     - **Parliamentary**: quorum and majority of votes cast decide
     - **Consultative**: input is advisory; the lead records the outcome
 
-    Proof suggests a default based on your institution's ethos, but you can change it before the first committee vote.
+    If your college lets projects ask for an exception, you can use a different model: click **Ask for a different model…**, choose the model under **Ask for**, and give a reason. The ask is sent with the project and decided by the people the line names. The project changes model only if they approve before its committee's first vote.
   </Step>
-  <Step title="Create the project">
-    Click **Create Project**. Proof creates the project, initializes its phases, and opens the project detail screen.
+  <Step title="Submit or create">
+    For a compliance project, click **Submit for approval**. For any other type, click **Create Project**. See [Compliance projects go through approval](#compliance-projects-go-through-approval).
   </Step>
   <Step title="Set up the team (optional)">
     If you are the project owner or lead, the team setup wizard opens on the project detail screen. Assign members to roles to generate tasks automatically, or close the wizard to add team members later.
@@ -76,17 +71,18 @@ You need one of the following to start a project:
     Click **Projects** in the sidebar. If this is your first project, click **Enter the First Project** in the empty state.
   </Step>
   <Step title="Open the creation dialog">
-    Click the **Enter a Project** button at the top of the screen.
+    Click the **Enter a project** button at the top of the screen.
   </Step>
   <Step title="Fill in the project details">
     Complete the form:
 
     - **Initiative Name**: a unique name for the project
-    - **Initiative Type**: choose from Compliance, Curriculum, Faculty, Scheduling, or General
-    - **Department**: required for Curriculum and Faculty projects; optional for others
-    - **Link to Entity**: optionally link to a compliance rule, policy, regulatory change, or audit cycle
+    - **Initiative Type**: **Compliance & Regulatory**, **Curriculum Development**, **Faculty & Staffing**, **Scheduling & Planning**, or **General Project**
+    - **Accrediting agency (Optional)**: for a compliance project, the agency whose standards it answers to
+    - **Department**: required for curriculum and faculty projects; optional for others
+    - **Link to Entity (Optional)**: link to a compliance rule, policy, regulatory change, or audit cycle
     - **Description**: scope and goals
-    - **Primary Objective**: helps Proof generate accurate timeline recommendations
+    - **Strategic objective it serves**: appears when your college's Ethos asks new work to name an objective. It may be filled in from your department's projects.
   </Step>
   <Step title="Analyze feasibility">
     Click **Analyze Feasibility**. Proof generates timeline variants for you to compare.
@@ -103,16 +99,29 @@ You need one of the following to start a project:
 
     Click the card you want, then click **Continue with Selection**.
   </Step>
-  <Step title="Review and create">
-    Review the project summary, confirm or change the **Governance model**, then click **Create Project**. Proof creates the project and opens the **Project Created Successfully** dialog.
+  <Step title="Review and submit">
+    Review the project summary and the **Governance model** it starts on. To use a different model, click **Ask for a different model…** and give a reason.
+
+    Click **Submit for approval** for a compliance project, or **Create Project** for any other type. When a project is created, Proof opens the **Project Created Successfully** dialog.
   </Step>
   <Step title="Set up the team (optional)">
     Click **Set Up Team** to assign roles and generate tasks automatically. Click **Skip for now** if you want to add team members later from the project detail screen.
   </Step>
 </Steps>
 
+## Compliance projects go through approval
+
+Every compliance project goes through your college's approval route before its work starts. When you click **Submit for approval**, Proof sends it and tells you who it waits on, for example *Sent for approval: BSN self-study waits on Dana Reed*.
+
+Until your college writes its own route, Proof uses **Default — Compliance project approval**. It has one step, decided by whoever the request names: the owner of the policy it reviews, else the project's lead or owner, else its department's dean, else an institutional admin or compliance officer. You never approve your own request. An institutional admin can edit the route in the Approval Studio.
+
+If the project was started from a draft policy or regulatory change, that record goes into force only once the project is approved. If the project is declined, the record stays a draft.
+
+If Proof can't send the request, for example because no approver can be found, the project waits as a proposal. Once the route is fixed, send it from [Approvals](/user-guide/approvals/approvals) with **Submit for approval**.
+
 ## What happens next
 
+- A compliance project waits on its approvers. It appears in their [Approvals](/user-guide/approvals/approvals) queue, and its work starts once it is approved.
 - If you chose **Set Up Team**, Proof takes you to the project detail screen with the team setup wizard open. You can assign members to roles and Proof generates tasks based on the project type and timeline.
 - If you skipped team setup, the project appears in your **Projects** list with all phases initialized. You can open it at any time to add team members, upload evidence, and work through standards.
 - The project is automatically linked to the originating regulatory change or entity, so you can trace the work back to its source.

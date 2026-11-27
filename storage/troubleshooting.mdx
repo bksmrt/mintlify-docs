@@ -6,14 +6,15 @@ sidebarTitle: "Troubleshooting"
 
 ## Connection statuses
 
-Each storage connection shows a status badge in the **Storage** section of **Settings > Integrations** and in the **Import from cloud** dialog.
+Each storage connection shows a status badge in the **Storage** section of **Settings › Integrations** and in the **Import from cloud** dialog.
 
 | Status | Meaning | What to do |
 | --- | --- | --- |
 | **Connected** | Ready to browse and import. | Nothing. |
 | **Connecting…** | The provider sign-in was started but not finished. | Finish the provider sign-in, or start the connection again. |
 | **Needs attention** | Proof could not get or refresh access. The settings page shows the provider's error message. | Click **Reconnect** in the import dialog and sign in again. |
-| **Disconnected** | An administrator disconnected the account. Import history is kept. | Connect the account again if you still need it. |
+
+A disconnected account no longer appears in either list. Its import history is kept; connect the account again if you still need it.
 
 ## Errors after signing in to the provider
 
@@ -34,9 +35,13 @@ If the provider sends you back to Proof with an error, the page URL includes `st
   </Accordion>
 </AccordionGroup>
 
-## Provider shows as unavailable
+## Provider is not configured
 
-A provider appears in the connect list only when your Proof administrator has configured its OAuth client credentials. Trying to connect an unconfigured provider fails with `provider_not_configured`. Ask your Proof administrator to set it up.
+A provider works only when your Proof operator has configured its OAuth client. In **Settings › Integrations**, an unconfigured provider reads **Not configured by your administrator yet.** and cannot be connected. The **Import from cloud** dialog still lists it, and clicking **Connect** fails with `provider_not_configured`. Ask your Proof operator to set it up.
+
+## Demo Cloud Drive no longer works
+
+The **Demo Cloud Drive** is not offered on the live site. A connection made to it earlier still appears, but browsing fails with `unknown storage provider: mock`. Disconnect it in **Settings › Integrations › Storage**.
 
 ## Import errors
 
@@ -46,12 +51,14 @@ A provider appears in the connect list only when your Proof administrator has co
 | `imported file produced no extractable text` | The file has no text, such as a scanned PDF of images or an empty file. | Run OCR on the file or import a text-based version. |
 | `token refresh failed; reconnect required` | The provider revoked or expired Proof's access. | Reconnect the account. |
 | `engagement not accessible for this connection` | The project's engagement belongs to a different institution than the connection. | Use a connection from the engagement's institution. |
+| `storage connection has no credentials; reconnect required` | The connection lost its stored credentials. | Reconnect the account. |
 | **Already imported** | This file was imported from this connection before. | No action needed. Proof returns the existing evidence document. |
 
 ## Who can connect and disconnect
 
-- **Connect**: any member of the institution, so faculty and compliance staff can import from the evidence tab.
-- **Disconnect**: an `institutional_admin`, or a firm consultant with access to an engagement at that institution. Disconnecting removes stored credentials for everyone at the institution.
+- **Connect**: any member of the institution, from the **Import from cloud** dialog in a project's evidence tab. In **Settings › Integrations**, only an `institutional_admin` sees the **Connect** buttons.
+- **Disconnect**: an `institutional_admin`, or a firm consultant with access to an engagement at that institution. Others see **Only an institution admin can connect or disconnect cloud accounts.** Disconnecting removes stored credentials for everyone at the institution.
+- **Import into an engagement's project**: a firm consultant on that engagement, or an `institutional_admin`. Other institution users are refused with `engagement_forbidden`.
 
 ## Related
 

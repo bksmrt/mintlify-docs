@@ -31,6 +31,13 @@ Proof's reporting layer has three parts: the audit ledger that records what happ
 | Reports chat planner | `server/modules/reports-ask/plan.ts` |
 | Reports chat answer | `server/modules/reports-ask/summary.ts` |
 | Reports chat routes | `server/routes.ts::POST /api/reports/ask` |
+| Data catalog (custom reports) | `shared/report-data-catalog.ts`, `server/customReportData.ts` |
+| Custom report | `shared/custom-report.ts`, `server/customReport.ts` |
+| Thread export | `server/threadReport.ts` |
+| Firm portfolio report | `server/portfolioReport.ts` |
+| Record doors in report rows | `shared/record-doors.ts` |
+| Project read rule | `server/projectReaders.ts` |
+| Operator reports | `shared/operator-report-catalog.ts`, `server/operatorReports.ts` |
 | Client ask library | `client/src/lib/ask-reports.ts` |
 
 ## Audit ledger
@@ -54,7 +61,7 @@ The `GET /api/history` route is the canonical reader. It supports scopes: `insti
 
 For scoped record access, `HISTORY_RECORD_READERS` maps each record type to its storage reader. A course's History, for example, reads `GET /api/history?scope=record&type=course`. The route verifies the record exists in the caller's institution before returning rows.
 
-Readers differ in tenant scoping. `GET /api/my-activity` filters by `user_id` alone, while the trail route forces both `tenant_type` and `institution_id`. An engagement's activity filters by `entity_id` and type.
+A person's own activity is the `mine` scope. A record's History can also include its discussion with `with=discussion` (`server/historyDiscussion.ts`).
 
 ## Report Studio
 
@@ -72,21 +79,42 @@ The service in `server/modules/reporting/reporting.service.ts` returns `Rendered
 
 `shared/report-catalog.ts` is the single source of truth for every dedicated report. It lists each report's id, page, API route, export route, supported formats, read rule, parameters, and example questions.
 
-| Report id | Page | API | Formats |
+Each entry also names its module (`module`), so the module gate refuses a report's rows exactly as it refuses the module's pages. Every report offers CSV, Excel (`xlsx`), and PDF.
+
+| Report id | Page | API | Module |
 | --- | --- | --- | --- |
-| `history` | `/reports/history` | `/api/history/report` | csv, xlsx, pdf |
-| `open-work` | `/reports/open-work` | `/api/open-work` | csv, xlsx, pdf |
-| `obligations` | `/reports/obligations` | `/api/obligation-standing` | csv, xlsx, pdf |
-| `change-summary` | `/reports/change-summary` | `/api/change-summary` | csv, xlsx, pdf |
-| `kpis` | (pilot) | `/api/kpis` | csv, xlsx, pdf |
+| `history` | `/reports/history` | `/api/history/report` | `compliance_core` |
+| `open-work` | `/reports/open-work` | `/api/open-work` | `compliance_core` |
+| `phase-story` | `/reports/phase-story` | `/api/phase-story` | `compliance_core` |
+| `obligations` | `/reports/obligations` | `/api/obligation-standing` | `compliance_core` |
+| `change-summary` | `/reports/change-summary` | `/api/change-summary` | `compliance_core` |
+| `kpis` | `/reports/kpis` | `/api/kpi-report` | `compliance_core` |
+| `policies-as-of` | `/reports/policies-as-of` | `/api/policies-as-of` | `compliance_core` |
+| `custom` | `/reports/custom` | `/api/custom-report` | `compliance_core` |
+| `exceptions-register` | `/reports/exceptions-register` | `/api/exceptions-register` | `compliance_core` |
+| `compliance-calendar` | `/reports/compliance-calendar` | `/api/compliance-calendar` | `compliance_core` |
+| `regulatory-response` | `/reports/regulatory-response` | `/api/regulatory-response` | `compliance_core` |
+| `approval-cycle-time` | `/reports/approval-cycle-time` | `/api/approval-cycle-time` | `compliance_core` |
+| `alignment` | `/reports/alignment` | `/api/alignment-report` | `compliance_core` |
+| `portfolio` | `/reports/portfolio` | `/api/portfolio-report` | `firm_engagement` |
+| `faculty-roster` | `/reports/faculty-roster` | `/api/faculty-roster` | `academic` |
+| `credit-hours` | `/reports/credit-hours` | `/api/credit-hours` | `academic` |
+| `assessment` | `/reports/assessment` | `/api/assessment-report` | `academic` |
+
+A tenant without an optional module still opens that module's report doors, but `GET /api/reports/preview/:reportId` serves a preview in its place: at most three of the college's own rows, those needing attention first, read by the report's own rule. The full route still answers `402`.
 
 No module spells a report's address by hand. The catalog's helpers (`reportHref`, `reportApiUrl`, `reportParamsFrom`, `reportQuery`) are enforced by a CI test in `scripts/__tests__/report-address.test.ts`.
 
-Read rules:
+Each report declares a read rule (`ReportReadRule`), enforced on the server: for example `college-history-readers` (admins, compliance officers, and faculty), `project-readers` (anyone who can read the project), `person-or-college-readers`, `college-or-department-readers` (a department head reads her departments), `roster-readers`, and `firm-engagement-readers`. Who can read a project is decided in one place, `server/projectReaders.ts`.
 
-- `college-history-readers`: admins, compliance officers, and faculty on the college's staff
-- `project-readers`: anyone who can read the project
-- `person-or-college-readers`: the person themselves, or the college's staff
+## Custom reports
+
+The chat and the builder can build a report from records the delivered reports don't cover.
+
+- `shared/report-data-catalog.ts` lists every record type a custom report may read (gaps, requirements, evidence, tasks, projects, standards, policies, regulatory changes, exceptions, approvals, strategic objectives, courses, programs, faculty, sections, and more), each field named in the college's words, each type with its module and reader rule. The server refuses any type, field, or value the catalog does not list.
+- `server/customReportData.ts` reads each type's rows by its own rule.
+- `shared/custom-report.ts` is the report's definition; `server/customReport.ts` runs it and exports it. `GET /api/custom-report` serves it.
+- College custom fields (`/api/college-fields`, `server/collegeFields.ts`) join the catalog as columns. Only institutional admins add or edit them.
 
 ## Shared export module
 
@@ -100,15 +128,15 @@ export async function reportWorkbook(
 ): Promise<Buffer>
 ```
 
-Every workbook opens identically: frozen header, bold column labels, and an About sheet with who made it, when, in which time zone, and how to read it. The change summary, Obligations standing, KPI report, History, and Open work all route through here.
+Every workbook opens identically: frozen header, bold column labels, and an About sheet with who made it, when, in which time zone, and how to read it. Every delivered report, custom reports, operator reports, the delivery report, and discussion thread exports route through here. The Period change summary is the foundational report: every report's screen, Excel, PDF, and CSV follow its shape.
 
 ## Saved reports and sharing
 
 `server/savedReports.ts` implements saved reports. A saved report is its maker's own: a name over one catalog report and its parameters. Names are unique per maker and kind.
 
-The maker and college admins can rename and archive. Sharing is separate: `server/reportShares.ts` lets a maker share a saved report with specific users or roles. Recipients see it in their own list but cannot edit it.
+The maker can rename and archive it. Sharing is separate: `server/reportShares.ts` shares a saved report inside the college with people, a role, a department, or a committee, as Can view or Can comment. A view-only external link (`/api/saved-reports/:id/links`) points at a snapshot taken at the time, for 30 days by default and 90 at most. A schedule (`/api/saved-reports/:id/schedule`) emails the report daily, weekly, monthly, or at the month's close; `server/workers/reportDeliverySchedule.ts` sends it.
 
-Snapshots are attached to saved reports by key. The latest snapshot for each key is surfaced in the list.
+Snapshots are kept per report (`/api/reports/:reportId/snapshots`). A firm member's saved Portfolio report is stored the same way with `tenant_type = firm`, and operators' saved reports under the platform tenant.
 
 ## Reports chat
 
@@ -120,6 +148,8 @@ Snapshots are attached to saved reports by key. The latest snapshot for each key
 2. **Rows**: `server/modules/reports-ask/rows.ts` fetches the report data by the catalog's own API, enforcing the report's read rule.
 3. **Summary**: `server/modules/reports-ask/summary.ts` writes a natural-language summary with citations back to the report.
 4. **Answer**: The route returns a JSON answer with a link to the report, the summary, and follow-up questions.
+
+Before reading a report the route asks the module gate (`buildModuleCheck`) about that report's route, so the chat never reads rows the tenant's own route would refuse. A question can carry a source, such as a saved report or a record, chosen with `/link` (`GET /api/reports/ask/sources`). The same backend answers Report Studio's chat and the ⌘K box.
 
 A streaming variant exists at `POST /api/reports/ask/stream`. It sends SSE events for phase, link, summary delta, and final answer.
 
@@ -144,6 +174,8 @@ Recent questions are kept per user per institution. The `GET /api/reports/ask/re
 
 ## Related pages
 
+- [Catalog pipeline and delivery](/engineering/areas/catalog-pipeline)
+- [Billing and modules](/engineering/foundations/billing-and-modules)
 - [Integrations internals](/engineering/areas/integrations-internals)
 - [AI services](/engineering/foundations/ai-services)
 - [Database and migrations](/engineering/foundations/database-and-migrations)

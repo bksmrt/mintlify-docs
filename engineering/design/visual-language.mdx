@@ -18,6 +18,8 @@ Proof's visual language is a contract: one meaning per mark, everywhere. It gove
 | Marks tests | `client/src/lib/__tests__/proof-marks.test.ts` |
 | Component mark tests | `client/src/components/__tests__/proof-mark.test.tsx` |
 | vl-marks ratchet | `scripts/__tests__/vl-marks.ratchet.test.ts` + `vl-marks.baseline.json` |
+| Standard-frame ratchet | `scripts/__tests__/vl17-frame.ratchet.test.ts` + `vl17-frame.baseline.json` (empty baseline) |
+| The register | `client/src/components/register/register.tsx`, `docs/design/register-canonical.md` |
 | Standard census | `docs/design/visual-language/standard-census.md` |
 | Code census | `docs/design/visual-language/code-census.md` |
 | Decision census | `docs/design/visual-language/decisions-census.md` |
@@ -47,6 +49,24 @@ These rules are the owner's decided framework. Every mark on prose is drawn thro
 | **VL-R15** | A struck sentence is leaving: words of the college's text that a person marked to go and not yet saved away. It wears the removed look in the text itself. |
 | **VL-R16** | A briefcase holding initials is a consulting firm's hand. It says who wrote it, never whose move it is. It takes no tone and never replaces the change's own marks. |
 | **VL-R17** | A standard's name is one frame: an unfilled square frame in ink-soft, square corners, no fill, the register's caps face. It is never toned and never underlined. Where the standard opens, the words beside it do, or the frame itself keeps its door with no link mark. |
+| **VL-R18** | In a list, a door's mark waits for the row: the row's own name is lightly marked at rest, its other doors show their mark when the row is hovered or focused, and on a touch screen every door is lightly marked at rest. One rule in `Mark.css`, held by `scripts/__tests__/lp-q3-door-marks.test.ts`. |
+| **VL-R19** | No new seal: the concentric-ring seal shape is never drawn for a new mark, badge, tier, or score. The ICI's own foil seal stands. |
+
+The rule codes (VL-R1 and so on) appear in code comments across the client, so they are kept here as names.
+
+The tone names are tokens, not literal colors: `oak` is now an umber (`#7D6252`) and `ink` a warm charcoal. See [Proof Kit](/engineering/design/proof-kit) for the palette.
+
+## Lists, pages, and tabs
+
+Three app-wide rules sit beside the marks:
+
+- **The register is light.** Every list renders through the one register component (`components/register/register.tsx`) in the custom report builder's light look: no box and no parchment band, small mono column heads over a hairline, solid hairlines between rows, the select bar in the selected rows' oak wash. `docs/design/register-canonical.md` defines the eight row slots and two densities and wins on any disagreement.
+- **One register, one toolbar.** Every register fills its page's column and uses `RegisterToolbar`: search, a view button only where a page has more than one layout, *Actions ▾*, and the one primary. Views and filters are one panel, opened by the filter mark at the search's right end. While that panel is open, a row's place and person slots fold into the line under its name.
+- **Select is a row's.** No register draws a Select button. *Select* is the first entry of each row's ⋯ and starts select mode with that row ticked; on a touch screen a 500ms press and hold does the same. *Done* rides the select bar. Held by `scripts/__tests__/register-select.test.ts`. A row with nothing to do draws no empty ⋯.
+- **Two page frames.** A page is a centred 1040px column or an edge-to-edge desk, read from `lib/proof/page-frame.ts`. See [Proof Kit](/engineering/design/proof-kit#the-page-frame).
+- **One breadcrumb trail, in the header.** No page draws a breadcrumb or a hand-written way back of its own.
+- **Pages are flat.** Large-masthead pages render `<JournalPage looseLeaf>`, straight on the desk. A record page's sheet is a measure only, with no fill, hairline, lift, or texture; a card is set apart by its hairline, never a lighter fill.
+- **A filter is never a tab bar.** A register's facets live in its Filters button, and `RegisterScope` (`components/proof/register-scope.tsx`) says in one line what is showing. The tab ribbon (`lib/proof/tabs.ts`) is for leaves of a page only. Held by `scripts/__tests__/register-scope.test.ts`.
 
 ## The marks module
 
@@ -71,7 +91,7 @@ const LOOK: Record<MarkMeaning, MarkLook> = {
 
 ## Standard names
 
-`StandardName` draws a standard's code in the one agreed frame. `standardNameParts(code, agency)` returns `{ agency, code }`. The agency's short name rides with the data: `GET /api/projects/:id/agency-standards` carries `agencyAbbreviation`; the catalog and Certification Studio read their agency's own. An obligation cite that names no agency shows the code alone until the payload carries it.
+`StandardName` draws a standard's code in the one agreed frame. `standardNameParts(code, agency)` returns `{ agency, code }`. The agency's short name rides with the data: `GET /api/projects/:projectId/agency-standards` carries `agencyAbbreviation`; the catalog and Certification Studio read their agency's own. An obligation cite that names no agency shows the code alone until the payload carries it.
 
 ## The ratchet
 

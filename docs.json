@@ -81,6 +81,7 @@
             "pages": [
               "user-guide/accreditation/projects",
               "user-guide/accreditation/compliance-workspace",
+              "user-guide/accreditation/gaps",
               "user-guide/accreditation/documents",
               "user-guide/accreditation/self-study",
               {
@@ -101,6 +102,9 @@
               "user-guide/compliance/regulatory-intelligence",
               "user-guide/compliance/policy-inventory",
               "user-guide/compliance/review-calendar",
+              "user-guide/compliance/manage-compliance",
+              "user-guide/compliance/exceptions",
+              "user-guide/compliance/compliance-calendar",
               {
                 "group": "How to",
                 "pages": [
@@ -149,14 +153,27 @@
             "group": "Reports and audit",
             "pages": [
               "user-guide/reports/report-studio",
+              "user-guide/reports/delivered-reports",
               "user-guide/reports/audit-trail",
               {
                 "group": "How to",
                 "pages": [
+                  "user-guide/reports/how-to/build-a-custom-report",
                   "user-guide/reports/how-to/share-and-schedule-a-report",
                   "user-guide/reports/how-to/check-who-changed-a-record"
                 ]
               }
+            ]
+          },
+          {
+            "group": "Institution",
+            "pages": [
+              "user-guide/institution/ethos",
+              "user-guide/institution/ethos-exceptions",
+              "user-guide/institution/strategic-plan",
+              "user-guide/institution/federal-statutes",
+              "user-guide/institution/scores",
+              "user-guide/institution/assistants"
             ]
           }
         ]
@@ -178,7 +195,9 @@
               "engineering/foundations/tenancy-and-auth",
               "engineering/foundations/database-and-migrations",
               "engineering/foundations/approvals-framework",
-              "engineering/foundations/ai-services"
+              "engineering/foundations/ai-services",
+              "engineering/foundations/score-family",
+              "engineering/foundations/billing-and-modules"
             ]
           },
           {
@@ -191,7 +210,8 @@
               "engineering/areas/ethos",
               "engineering/areas/suggestions-cockpits",
               "engineering/areas/integrations-internals",
-              "engineering/areas/reporting"
+              "engineering/areas/reporting",
+              "engineering/areas/catalog-pipeline"
             ]
           },
           {
@@ -232,7 +252,6 @@
     ]
   },
   "footer": {
-    "socials": {
-    }
+    "socials": {}
   }
 }

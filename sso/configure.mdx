@@ -4,19 +4,19 @@ description: "Step-by-step guide to creating, testing, and activating an SSO con
 sidebarTitle: "Configure"
 ---
 
-You create and manage SSO connections from the **Single Sign-On** panel in the Proof admin UI. The path is `/admin/sso` for institutions and the equivalent firm admin path for consulting firms.
+SSO connections are managed in the **Single Sign-On** panel on the Proof operator console: the **SSO** tab of your institution's (or firm's) page. You set up a connection together with your Proof operator. You enter your identity provider's details yourself, in the WorkOS Admin Portal, and you publish the DNS records for your domains.
 
 ## Create a connection
 
 <Steps>
   <Step title="Open the SSO panel">
-    Navigate to **Single Sign-On** in your tenant admin settings.
+    Open the **SSO** tab for your institution or firm. The panel is titled **Single Sign-On**.
   </Step>
   <Step title="Add a connection">
-    Click **Add Connection**. In the dialog, enter a display name, such as "Okta" or "Azure AD".
+    Click **Add Connection**. In the **New SSO Connection** dialog, enter a **Display name**, such as "Okta" or "Azure AD".
   </Step>
   <Step title="Choose a default role">
-    Select the default role for users who do not match any role mapping rule. The options are:
+    Select the **Default role** for users who do not match any role mapping rule. It starts as `faculty`. The options are:
 
     - `institutional_admin`
     - `compliance_officer`
@@ -25,25 +25,25 @@ You create and manage SSO connections from the **Single Sign-On** panel in the P
     - `auditor`
   </Step>
   <Step title="Require SSO (optional)">
-    Check **Require SSO for users on matched domains (block fallback login)** if you want to block standard sign-in for users on verified domains.
+    Check **Require SSO for users on matched domains (block fallback login)** to refuse standard sign-in for users on the connection's verified domains once it is active.
   </Step>
   <Step title="Create the draft">
     Click **Create draft**. The connection starts in **draft** status.
   </Step>
 </Steps>
 
-<Note>
-  New connections are WorkOS-backed. You do not upload IdP secrets in Proof. Instead, you configure the IdP through the WorkOS Admin Portal.
-</Note>
-
 ## Configure the IdP through WorkOS
 
-After creating the connection, open its detail panel and click **Configure SSO**. This opens the WorkOS Admin Portal in a new tab, where you enter your IdP metadata.
+Every new connection is WorkOS-backed, so you never paste IdP secrets into Proof. Instead, Proof generates a WorkOS Admin Portal link for the connection, and you enter your IdP details there:
 
-- For **SAML** providers, you paste the IdP metadata URL or XML.
+- For **SAML** providers, you provide the IdP metadata URL or XML.
 - For **OIDC** providers, you enter the issuer, client ID, and client secret.
 
 WorkOS stores the secrets and handles the protocol handshake. Proof never sees the raw client secret or private key.
+
+<Note>
+  The connection's panel has no button for the Admin Portal today. Ask your Proof operator for the link. Generating it creates the connection's WorkOS organization, and sign-in cannot start until that organization exists.
+</Note>
 
 ## Add and verify email domains
 
@@ -61,25 +61,39 @@ Before you can activate the connection, you must verify at least one email domai
     Value: bksmrt-sso-verify=<token>
     ```
 
-    You can also add it to `_bksmrt-sso.acme.edu` if you prefer.
+    You can also add it to `_bksmrt-sso.acme.edu` if you prefer. The value can sit inside a longer TXT record.
   </Step>
   <Step title="Verify">
-    Return to Proof and click **Verify**. Proof queries DNS and, if the record is found, marks the domain as **verified**.
+    Return to Proof and click **Verify**. Proof queries DNS at both names and, if the record is found, marks the domain as **verified**. If it is not found, you see **Verification failed** with the reason.
   </Step>
 </Steps>
 
 You can add multiple domains to a single connection. Only verified domains are used for email lookup at sign-in.
 
+## Map groups and claims to roles
+
+In the **Role Mapping Rules** section, add a rule for each role you want to assign from your IdP:
+
+- **Match**: `group`, `claim`, or `domain`.
+- **Claim key**: for a `claim` rule, the claim to read.
+- **Value**: the group name, claim value, or email domain to match.
+- **Assign role**: one of the five roles above.
+- **Pri**: the priority. Lower numbers are checked first; the default is `100`.
+
+Click **Add** to save the rule.
+
+See [SSO roles and sessions](/sso/roles-and-sessions) for how rules are evaluated.
+
 ## Test the connection
 
-Before going live, click **Test** on the connection detail panel. Proof runs a protocol-aware dry-run check that does not start a real sign-in flow.
+Before going live, click **Test** on the connection's panel. Proof runs a dry-run check that does not start a real sign-in flow.
 
-The test results show:
+For a WorkOS connection, the results show:
 
-- **Checks**: individual pass or fail items, such as OIDC discovery, JWKS reachability, or IdP certificate validity.
-- **Round-trip**: whether Proof successfully reached the IdP and received a meaningful response.
+- **Checks**: pass or fail items, such as **WorkOS organization** and **WorkOS connection**.
+- **Round-trip**: **Round-trip OK** when Proof reached the WorkOS API and found the connection, or **Round-trip failed** with the reason.
 
-A passing test means the connection is ready to activate. A failing test shows the specific check that did not pass, along with an error detail.
+A failing test names the check that did not pass. "WorkOS organization not provisioned" means the Admin Portal link has not been generated yet.
 
 ## Activate or disable
 
@@ -87,24 +101,27 @@ Once you have at least one verified domain and the test passes, click **Activate
 
 To pause SSO for the tenant, click **Disable**. Disabling a connection immediately revokes all active sessions tied to it, forcing users to re-authenticate.
 
-To remove a connection permanently, click the delete button. Deleting also revokes all sessions and removes the connection from the tenant.
+To remove a connection permanently, click the delete (trash) button and confirm. Deleting also revokes all sessions tied to the connection.
 
 ## Force logout all
 
-If you need to terminate every active SSO session for the tenant at once, click **Force logout all**. This revokes all sessions across every connection for the tenant. Users are signed out immediately and must re-authenticate on their next visit.
+To end every active SSO session for the tenant at once, click **Force logout all** and confirm **Force logout**. This revokes sessions across every connection for the tenant. Users are signed out immediately and must re-authenticate on their next visit. Proof operators are not affected.
 
 ## Troubleshooting common errors
 
 | Error | Cause | Resolution |
 | --- | --- | --- |
-| "Connection requires at least one verified email domain before activation" | You tried to activate before adding a verified domain. | Add a domain, publish the TXT record, and verify it. |
+| "Connection requires at least one verified email domain before activation" | You tried to activate before verifying a domain. | Add a domain, publish the TXT record, and verify it. |
 | "Public mailbox domains (gmail.com, outlook.com, etc.) cannot be claimed" | You tried to add a consumer email domain. | Use your organization's domain, such as `university.edu`. |
-| "Domain is already claimed by another connection" | Another tenant has already verified this domain. | Contact the other tenant's admin, or use a different domain. |
-| "Invalid domain format" | The entered text is not a valid domain. | Remove `https://`, paths, and `@` symbols. Enter only the domain, such as `acme.edu`. |
-| "DNS lookup did not find the TXT record" | The TXT record is missing or has not propagated. | Wait for DNS propagation, then click **Verify** again. |
-| "Could not start SSO sign-in" | The connection status is not active, or WorkOS configuration is incomplete. | Confirm the connection is active and that the IdP setup in the WorkOS Admin Portal is complete. |
-| "Sign-in failed" (redirect to `/?sso_error=...`) | The IdP rejected the authentication, or the user does not have access. | Check the IdP logs and the Proof SSO audit log for the specific failure reason. |
+| "Domain is already claimed by another connection" | Another connection has already verified this domain. | Contact that connection's admin, or use a different domain. |
+| "Domain already added to this connection" | The domain is already on this connection. | Verify the existing entry instead. |
+| "Invalid domain format" | The entered text is not a valid domain. | Enter only the domain, such as `acme.edu`. Proof strips a leading `@` or `https://` for you. |
+| `TXT record "bksmrt-sso-verify=<token>" not found at …` | The TXT record is missing or has not propagated. | Wait for DNS propagation, then click **Verify** again. |
+| "New SSO connections must use WorkOS" | Someone tried to create an in-house OIDC or SAML connection. | Create a WorkOS-backed connection. |
+| "Could not start SSO sign-in" | Sign-in could not start, most often because the connection has no WorkOS organization yet. | Generate the Admin Portal link and finish the IdP setup there. |
+| "Legacy SAML sign-in is no longer supported" or "In-house OIDC sign-in has been retired" | The connection was created with a retired in-house protocol. | Create a WorkOS-backed connection and move the domains to it. |
+| "This email is already linked to a different organization's SSO" | The account is bound to another SSO connection. | Check which connection owns the user, then fix it there. |
 
-## SAML service provider metadata
-
-If your IdP requires Proof's SP metadata, and the connection protocol is SAML, the detail panel shows a **SP Metadata** download button. The XML contains the Assertion Consumer Service URL and entity ID for the connection.
+<Note>
+  A legacy SAML connection's panel still offers an **SP Metadata** download, but sign-in through legacy SAML connections is refused. New connections never need it: WorkOS provides the service provider details in the Admin Portal.
+</Note>

@@ -24,6 +24,8 @@ Proof uses multiple LLM providers for extraction, classification, narrative assi
 | `server/modules/rag/retriever.ts` | Thin adapter over the hybrid retrieval engine for narrative intelligence |
 | `server/modules/evidence-matching/hybrid-retriever.ts` | BM25 + vector hybrid search with optional LLM reranking |
 | `shared/pgvector.ts` | Vector serialization, parsing, and cosine similarity |
+| `shared/assistant-floor.ts` | Every model feature the server names, classified once (`MODEL_FEATURES`), held by `scripts/__tests__/assistant-floor.test.ts` |
+| `server/assistantGate.ts`, `server/firmAssistantGate.ts` | The check an assistant's route asks before it calls a model |
 | `docs/ai-model-management.md` | Provider configuration, rotation, and diagnosis notes |
 
 ## Providers
@@ -95,6 +97,14 @@ The router accepts a `taskType` label for every request. Examples include:
 - `report_question` and `report_summary`
 
 Task types are used for usage attribution and cost rollup.
+
+## Assistants and their switches
+
+`shared/assistant-floor.ts` classifies every model feature the server names: an **assistant** (a person asks and reads its words), a **reader** (reads the college's words against a requirement; a person decides), **intake**, a **summary**, an **operator** feature, or an **index**. Every assistant answers to one switch on *Settings › Assistants* (`GET /api/assistants`, `PATCH /api/assistants/:key`): for example `workspaceAssistant` for the walk and Rewrite, `reportsAssistant` for Report Studio's chat and the ⌘K box, `schedulingAssistant` for the staff's three scheduling advisors. A feature the server names and the table does not fails the test.
+
+Before an assistant's route calls a model it asks `assistantRefusal` (`server/assistantGate.ts`): the person's own opt-out first, then the college's switch, each refused in words. A missing switch reads as on. The firm's portfolio answer answers to the firm's own *Portfolio assistant* switch, and each engaged college's *Reports assistant* keeps that college's records out of the answer, which names it (`server/firmAssistantGate.ts`).
+
+`GET /api/assistant/conversations` lists a person's other conversations with the assistant (workspace walks, policy Chats, Ethos configuration), leaving out any on a record she can no longer read (`server/assistantConversations.ts`).
 
 ## Rate limiting
 
